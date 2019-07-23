@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"sort"
 )
 
 /*
@@ -78,6 +79,7 @@ func (c CIDR) Gateway() string {
 
 // 广播地址(网段最后一个IP)
 func (c CIDR) Boardcast() string {
+	// TODO 优化: 广播地址 = 网络号 | (~子网掩码)
 
 	// IP字符串转换成二进制字符串
 	var bs []byte
@@ -159,21 +161,21 @@ func (c CIDR) Contains(ip string) bool {
 
 // 裂解子网的方式
 const (
-	SUBNET_METHOD_BASE_SUBNET = 0 // 基于子网数量
-	SUBNET_METHOD_BASE_HOST   = 1 // 基于主机数量
+	SUBNETTING_METHOD_SUBNET_NUM = 0 // 基于子网数量
+	SUBNETTING_METHOD_HOST_NUM   = 1 // 基于主机数量
 )
 
 // 裂解子网
-func (c CIDR) SubNeting(method, num int) ([]*CIDR, error) {
-	if num <= 0 || (num&(num-1)) != 0 {
+func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
+	if num < 1 || (num&(num-1)) != 0 {
 		return nil, fmt.Errorf("裂解数量必须是2的次方")
 	}
 
 	ones, bits := c.MaskSize()
 	dstOnes := ones
-	if method == SUBNET_METHOD_BASE_SUBNET {
+	if method == SUBNETTING_METHOD_SUBNET_NUM {
 		dstOnes = ones + int(math.Log2(float64(num)))
-	} else if method == SUBNET_METHOD_BASE_HOST {
+	} else if method == SUBNETTING_METHOD_HOST_NUM {
 		dstOnes = bits - int(math.Log2(float64(num)))
 		// 如果子网的掩码位数和父网段一样，说明不能再裂解啦
 		if dstOnes <= ones {
@@ -192,9 +194,86 @@ func (c CIDR) SubNeting(method, num int) ([]*CIDR, error) {
 		cidrs = append(cidrs, cidr)
 
 		// 广播地址的下一个IP即为下一段的网络号
-		network := net.ParseIP(cidr.Boardcast())
+		network = net.ParseIP(cidr.Boardcast())
 		IPIncr(network)
 	}
 
 	return cidrs, nil
+}
+
+type CIDRList []*CIDR
+
+func (c CIDRList) Len() int      { return len(c) }
+func (c CIDRList) Swap(i, j int) { c[i], c[j] = c[j], c[i] }
+func (c CIDRList) Less(i, j int) bool {
+	// TODO 暂且由外部保证协议类型相同
+
+	// 掩码不同时，比较掩码长度，掩码长度越大，网段越小
+	c1ones, _ := c[i].MaskSize()
+	c2ones, _ := c[j].MaskSize()
+	if c1ones > c2ones {
+		return true
+	} else if c1ones < c2ones {
+		return false
+	}
+
+	// 掩码相同时，比较网络号，网络号越小，网段越小
+	for n := 0; n < len(c[i].network.IP); n++ {
+		if c[i].network.IP[n] > c[j].network.IP[n] {
+			return false
+		} else if c[i].network.IP[n] < c[j].network.IP[n] {
+			return true
+		}
+	}
+	return false
+}
+
+// 子网合并
+func SuperNetting(ns []string) (*CIDR, error) {
+
+	// 子网数量必须是2的次方
+	num := len(ns)
+	if num < 1 || (num&(num-1)) != 0 {
+		return nil, fmt.Errorf("子网数量必须是2的次方")
+	}
+
+	mask := ""
+	cidrs := CIDRList{}
+	for _, n := range ns {
+		// 检查子网CIDR有效性
+		c, err := ParseCIDR(n)
+		if err != nil {
+			return nil, fmt.Errorf("网段%v格式错误", n)
+		}
+		cidrs = append(cidrs, c)
+
+		// 暂只考虑相同子网掩码的网段合并
+		if len(mask) == 0 {
+			mask = c.Mask()
+		} else if c.Mask() != mask {
+			return nil, fmt.Errorf("子网掩码不一致")
+		}
+	}
+	sort.Sort(cidrs)
+
+	// 检查网段是否连续
+	var network net.IP
+	for _, c := range cidrs {
+		if len(network) > 0 {
+			if !network.Equal(c.network.IP) {
+				return nil, fmt.Errorf("必须是连续的网段")
+			}
+		}
+		network = net.ParseIP(c.Boardcast())
+		IPIncr(network)
+	}
+
+	// 子网掩码左移，得到共同的父网段
+	c := cidrs[0]
+	ones, bits := c.MaskSize()
+	ones = ones - int(math.Log2(float64(num)))
+	c.network.Mask = net.CIDRMask(ones, bits)
+	c.network.IP.Mask(c.network.Mask)
+
+	return c, nil
 }
