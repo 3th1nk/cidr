@@ -36,6 +36,16 @@ func TestBoardcast(t *testing.T) {
 	fmt.Println("IPv6:", c2.Boardcast())
 }
 
+func TestIPRange(t *testing.T) {
+	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
+	start1, end1 := c1.IPRange()
+	fmt.Println(start1, end1)
+
+	c2, _ := cidr.ParseCIDR("2001:db8::/64")
+	start2, end2 := c2.IPRange()
+	fmt.Println(start2, end2)
+}
+
 func TestSubNetting(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
 	cs1, _ := c1.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)

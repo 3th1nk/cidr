@@ -123,15 +123,7 @@ func (c CIDR) Boardcast() string {
 
 // 起始IP、结束IP
 func (c CIDR) IPRange() (startIP, endIP string) {
-	next := c.ip.Mask(c.network.Mask)
-	for c.network.Contains(next) {
-		if len(startIP) == 0 {
-			startIP = next.String()
-		}
-		endIP = next.String()
-		IPIncr(next)
-	}
-	return
+	return c.Network(), c.Boardcast()
 }
 
 // 网段下所有IP, 包含网络号、主机可用地址(含网关地址)、广播地址
