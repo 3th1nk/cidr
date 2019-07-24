@@ -69,7 +69,7 @@ func (c CIDR) Mask() string {
 // 网关(默认为网段第二个IP)
 func (c CIDR) Gateway() string {
 	gateway := ""
-	next := c.ip.Mask(c.network.Mask)
+	next := c.network.IP
 	for step := 0; step < 2 && c.network.Contains(next); step++ {
 		gateway = next.String()
 		IPIncr(next)

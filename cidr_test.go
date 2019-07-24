@@ -13,7 +13,6 @@ func TestAllIP(t *testing.T) {
 	for {
 		ip, ok := <-ips
 		if !ok {
-			fmt.Println("done")
 			break
 		}
 		fmt.Println(ip)
@@ -22,18 +21,26 @@ func TestAllIP(t *testing.T) {
 
 func TestMask(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	fmt.Println("IPv4:", c1.Mask())
+	fmt.Println(c1.Mask())
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
-	fmt.Println("IPv6:", c2.Mask())
+	fmt.Println(c2.Mask())
+}
+
+func TestGateway(t *testing.T) {
+	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
+	fmt.Println(c1.Gateway())
+
+	c2, _ := cidr.ParseCIDR("2001:db8::/64")
+	fmt.Println(c2.Gateway())
 }
 
 func TestBoardcast(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	fmt.Println("IPv4:", c1.Boardcast())
+	fmt.Println(c1.Boardcast())
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
-	fmt.Println("IPv6:", c2.Boardcast())
+	fmt.Println(c2.Boardcast())
 }
 
 func TestIPRange(t *testing.T) {
@@ -49,14 +56,14 @@ func TestIPRange(t *testing.T) {
 func TestSubNetting(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
 	cs1, _ := c1.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-	fmt.Println("IPv4子网划分:")
+	fmt.Println(c1.CIDR(), "子网划分:")
 	for _, c := range cs1 {
 		fmt.Println(c.CIDR())
 	}
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
 	cs2, _ := c2.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-	fmt.Println("IPv6子网划分:")
+	fmt.Println(c2.CIDR(), "子网划分:")
 	for _, c := range cs2 {
 		fmt.Println(c.CIDR())
 	}
