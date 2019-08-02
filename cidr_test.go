@@ -6,17 +6,12 @@ import (
 	"testing"
 )
 
-func TestAllIP(t *testing.T) {
+func TestForEachIP(t *testing.T) {
 	c, _ := cidr.ParseCIDR("192.168.1.0/24")
-	ips := make(chan string)
-	go c.AllIP(ips)
-	for {
-		ip, ok := <-ips
-		if !ok {
-			break
-		}
+	c.ForEachIP(func(ip string) bool {
 		fmt.Println(ip)
-	}
+		return true
+	})
 }
 
 func TestMask(t *testing.T) {

@@ -126,14 +126,15 @@ func (c CIDR) IPRange() (startIP, endIP string) {
 	return c.Network(), c.Boardcast()
 }
 
-// 网段下所有IP, 包含网络号、主机可用地址(含网关地址)、广播地址
-func (c CIDR) AllIP(ips chan<- string) {
+// 遍历网段下所有IP
+func (c CIDR) ForEachIP(iterator func(ip string) bool) {
 	next := c.ip.Mask(c.network.Mask)
 	for c.network.Contains(next) {
-		ips <- next.String()
+		if !iterator(next.String()) {
+			return
+		}
 		IPIncr(next)
 	}
-	close(ips)
 }
 
 // IP地址自增
