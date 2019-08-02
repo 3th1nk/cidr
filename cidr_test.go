@@ -8,9 +8,9 @@ import (
 
 func TestForEachIP(t *testing.T) {
 	c, _ := cidr.ParseCIDR("192.168.1.0/24")
-	c.ForEachIP(func(ip string) bool {
+	c.ForEachIP(func(ip string) error {
 		fmt.Println(ip)
-		return true
+		return nil
 	})
 }
 

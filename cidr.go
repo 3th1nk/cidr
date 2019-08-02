@@ -127,14 +127,15 @@ func (c CIDR) IPRange() (startIP, endIP string) {
 }
 
 // 遍历网段下所有IP
-func (c CIDR) ForEachIP(iterator func(ip string) bool) {
+func (c CIDR) ForEachIP(iterator func(ip string) error) error {
 	next := c.ip.Mask(c.network.Mask)
 	for c.network.Contains(next) {
-		if !iterator(next.String()) {
-			return
+		if err := iterator(next.String()); err != nil {
+			return err
 		}
 		IPIncr(next)
 	}
+	return nil
 }
 
 // IP地址自增
