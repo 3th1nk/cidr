@@ -69,7 +69,7 @@ func (c CIDR) Mask() string {
 // 网关(默认为网段第二个IP)
 func (c CIDR) Gateway() string {
 	gateway := ""
-	next := c.network.IP
+	next := c.ip.Mask(c.network.Mask)
 	for step := 0; step < 2 && c.network.Contains(next); step++ {
 		gateway = next.String()
 		IPIncr(next)
@@ -82,8 +82,9 @@ func (c CIDR) Boardcast() string {
 	// TODO 优化: 广播地址 = 网络号 | (~子网掩码)
 
 	// IP字符串转换成二进制字符串
+	network := c.ip.Mask(c.network.Mask)
 	var bs []byte
-	for _, b := range c.network.IP {
+	for _, b := range network {
 		for i := 0; i < 8; i++ {
 			b2 := b
 			b <<= 1
@@ -182,7 +183,7 @@ func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 	}
 
 	cidrs := []*CIDR{}
-	network := c.network.IP
+	network := c.ip.Mask(c.network.Mask)
 	for i := 0; i < num; i++ {
 		cidr, _ := ParseCIDR(fmt.Sprintf("%v/%v", network.String(), dstOnes))
 		cidrs = append(cidrs, cidr)
