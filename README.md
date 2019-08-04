@@ -23,7 +23,7 @@
     }
 
     # 基于主机数量划分子网段
-    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 64)
+    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_HOST_NUM, 64)
     for _, c := range cs {
         fmt.Println(c.CIDR())
     }
