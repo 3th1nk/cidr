@@ -8,10 +8,12 @@ import (
 
 func TestForEachIP(t *testing.T) {
 	c, _ := cidr.ParseCIDR("192.168.1.0/24")
-	c.ForEachIP(func(ip string) error {
+	if err := c.ForEachIP(func(ip string) error {
 		fmt.Println(ip)
 		return nil
-	})
+	}); err != nil {
+		fmt.Println(err.Error())
+	}
 }
 
 func TestMask(t *testing.T) {
@@ -24,28 +26,28 @@ func TestMask(t *testing.T) {
 
 func TestGateway(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	fmt.Println(c1.Gateway())
+	fmt.Println(c1.Gateway(), c1.Network())
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
 	fmt.Println(c2.Gateway())
 }
 
-func TestBoardcast(t *testing.T) {
-	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	fmt.Println(c1.Boardcast())
+func TestBroadcast(t *testing.T) {
+	c1, _ := cidr.ParseCIDR("192.168.2.0/24")
+	fmt.Println(c1.Broadcast())
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
-	fmt.Println(c2.Boardcast())
+	fmt.Println(c2.Broadcast())
 }
 
 func TestIPRange(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
 	start1, end1 := c1.IPRange()
-	fmt.Println(start1, end1)
+	fmt.Println(c1.IPCount(), start1, end1)
 
-	c2, _ := cidr.ParseCIDR("2001:db8::/64")
+	c2, _ := cidr.ParseCIDR("2001:db8::/100")
 	start2, end2 := c2.IPRange()
-	fmt.Println(start2, end2)
+	fmt.Println(c2.IPCount(), start2, end2)
 }
 
 func TestSubNetting(t *testing.T) {
