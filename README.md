@@ -16,7 +16,7 @@
 
 ## 网段裂解
 
-    #### 基于子网数量划分子网段
+    # 基于子网数量划分子网段
     ns, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
     ```ns
         192.168.1.0/26
@@ -25,7 +25,7 @@
         192.168.1.192/26
     ```
 
-    #### 基于主机数量划分子网段
+    # 基于主机数量划分子网段
     ns, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 64)
 
 ## 网段合并
