@@ -17,25 +17,23 @@
 ## 网段裂解
 
     # 基于子网数量划分子网段
-    ns, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-    ```ns
-        192.168.1.0/26
-        192.168.1.64/26
-        192.168.1.128/26
-        192.168.1.192/26
-    ```
+    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
+    for _, c := range cs {
+        fmt.Println(c.CIDR())
+    }
 
     # 基于主机数量划分子网段
-    ns, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 64)
+    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 64)
+    for _, c := range cs {
+        fmt.Println(c.CIDR())
+    }
 
 ## 网段合并
 
-    c2, _ := cidr.SuperNetting([]string{
+    c, _ := cidr.SuperNetting([]string{
         "2001:db8::/66",
         "2001:db8:0:0:8000::/66",
         "2001:db8:0:0:4000::/66",
         "2001:db8:0:0:c000::/66",
     })
-    ```c2
-        2001:db8::/64
-    ```
+    fmt.Println(c.CIDR())
