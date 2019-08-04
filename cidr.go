@@ -146,7 +146,7 @@ const (
 	SUBNETTING_METHOD_HOST_NUM   = 1 // 基于主机数量
 )
 
-// (基于子网数量)裂解网段
+// 裂解网段
 func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 	if num < 1 || (num&(num-1)) != 0 {
 		return nil, fmt.Errorf("裂解数量必须是2的次方")
