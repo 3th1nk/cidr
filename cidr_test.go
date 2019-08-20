@@ -52,16 +52,23 @@ func TestIPRange(t *testing.T) {
 
 func TestSubNetting(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	cs1, _ := c1.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-	fmt.Println(c1.CIDR(), "子网划分:")
+	cs1, _ := c1.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 256)
+	fmt.Println(c1.CIDR(), "按子网数量划分:")
 	for _, c := range cs1 {
 		fmt.Println(c.CIDR())
 	}
 
 	c2, _ := cidr.ParseCIDR("2001:db8::/64")
 	cs2, _ := c2.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-	fmt.Println(c2.CIDR(), "子网划分:")
+	fmt.Println(c2.CIDR(), "按子网数量划分:")
 	for _, c := range cs2 {
+		fmt.Println(c.CIDR())
+	}
+
+	c3, _ := cidr.ParseCIDR("192.168.1.0/24")
+	cs3, _ := c3.SubNetting(cidr.SUBNETTING_METHOD_HOST_NUM, 64)
+	fmt.Println(c3.CIDR(), "按主机数量划分:")
+	for _, c := range cs3 {
 		fmt.Println(c.CIDR())
 	}
 }

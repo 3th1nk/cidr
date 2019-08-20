@@ -159,9 +159,13 @@ func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 		return nil, fmt.Errorf("不支持的裂解方式")
 	case SUBNETTING_METHOD_SUBNET_NUM:
 		newOnes = ones + newOnes
+		// 如果子网的掩码长度大于父网段的长度，则无法裂解
+		if newOnes > bits {
+			return nil, nil
+		}
 	case SUBNETTING_METHOD_HOST_NUM:
-		newOnes := bits - newOnes
-		// 如果子网的掩码位数和父网段一样，不能再裂解
+		newOnes = bits - newOnes
+		// 如果子网的掩码长度小于等于父网段的掩码长度，则无法裂解
 		if newOnes <= ones {
 			return nil, nil
 		}
