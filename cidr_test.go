@@ -16,6 +16,16 @@ func TestForEachIP(t *testing.T) {
 	}
 }
 
+func TestForEachIPBeginWith(t *testing.T) {
+	c, _ := cidr.ParseCIDR("192.168.1.0/24")
+	if err := c.ForEachIPBeginWith("192.168.1.230", func(ip string) error {
+		fmt.Println(ip)
+		return nil
+	}); err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
 func TestMask(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
 	fmt.Println(c1.Mask())

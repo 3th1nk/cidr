@@ -129,8 +129,8 @@ func (c CIDR) ForEachIP(iterator func(ip string) error) error {
 }
 
 // 从指定IP开始遍历网段下后续的IP
-func (c CIDR) ForEachIPBeginWith(ip string, iterator func(ip string) error) error {
-	next := net.ParseIP(ip)
+func (c CIDR) ForEachIPBeginWith(beginIP string, iterator func(ip string) error) error {
+	next := net.ParseIP(beginIP)
 	for c.ipnet.Contains(next) {
 		if err := iterator(next.String()); err != nil {
 			return err
