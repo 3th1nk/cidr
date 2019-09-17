@@ -53,11 +53,15 @@ func TestBroadcast(t *testing.T) {
 func TestIPRange(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
 	start1, end1 := c1.IPRange()
-	fmt.Println(c1.IPCount(), start1, end1)
+	fmt.Println(c1.IPCount().String(), start1, end1)
 
-	c2, _ := cidr.ParseCIDR("2001:db8::/100")
+	c2, _ := cidr.ParseCIDR("2001:db8::/64")
 	start2, end2 := c2.IPRange()
-	fmt.Println(c2.IPCount(), start2, end2)
+	fmt.Println(c2.IPCount().String(), start2, end2)
+
+	c3, _ := cidr.ParseCIDR("2001:db8::/8")
+	start3, end3 := c3.IPRange()
+	fmt.Println(c3.IPCount().String(), start3, end3)
 }
 
 func TestSubNetting(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"math/big"
 	"net"
 )
 
@@ -109,10 +110,9 @@ func (c CIDR) IPRange() (start, end string) {
 }
 
 // IP数量
-func (c CIDR) IPCount() int64 {
-	// TODO 暂不支持IPv6掩码 <= 64 的情况
+func (c CIDR) IPCount() *big.Int {
 	ones, bits := c.ipnet.Mask.Size()
-	return int64(math.Pow(2, float64(bits-ones)))
+	return big.NewInt(0).Lsh(big.NewInt(1), uint(bits-ones))
 }
 
 // 遍历网段下所有IP
