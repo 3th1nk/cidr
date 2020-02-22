@@ -1,6 +1,7 @@
 package cidr
 
 import (
+	"bytes"
 	"net"
 )
 
@@ -29,4 +30,10 @@ func DecrIP(ip net.IP) {
 			}
 		}
 	}
+}
+
+// 比较IP大小
+// a等于b，返回0; a大于b，返回+1; a小于b，返回-1
+func Compare(a, b net.IP) int {
+	return bytes.Compare(a, b)
 }

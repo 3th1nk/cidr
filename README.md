@@ -14,6 +14,13 @@
 	start, end := c.IPRange()
 	fmt.Println(c.IPCount(), start, end)
 
+    if err := c.ForEachIP(func(ip string) error {
+        // do something
+        return nil
+    }); err != nil {
+        fmt.Println(err)
+    }
+
 ## 网段裂解
 
     # 基于子网数量划分子网段

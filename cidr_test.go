@@ -1,9 +1,10 @@
 package cidr_test
 
 import (
-	"cidr"
 	"fmt"
 	"testing"
+
+	"github.com/3th1nk/cidr"
 )
 
 func TestForEachIP(t *testing.T) {
