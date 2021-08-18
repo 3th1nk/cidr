@@ -8,7 +8,6 @@
 
     c, _ := cidr.ParseCIDR("192.168.1.0/24")
     fmt.Println(c.Network())
-    fmt.Println(c.Gateway())
     fmt.Println(c.Broadcast())
 
 	start, end := c.IPRange()

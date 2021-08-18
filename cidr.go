@@ -81,15 +81,9 @@ func (c CIDR) Mask() string {
 	return net.IP([]byte(mask)).String()
 }
 
-// 网关(网段第二个IP)
-func (c CIDR) Gateway() (gateway string) {
-	gw := make(net.IP, len(c.ipnet.IP))
-	copy(gw, c.ipnet.IP)
-	for step := 0; step < 2 && c.ipnet.Contains(gw); step++ {
-		gateway = gw.String()
-		IncrIP(gw)
-	}
-	return
+// [Deprecated] 网关地址，无法计算出来，可以是网段中任意IP地址
+func (c CIDR) Gateway() string {
+	return ""
 }
 
 // 广播地址(网段最后一个IP)
