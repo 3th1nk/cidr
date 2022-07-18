@@ -8,18 +8,14 @@ import (
 	"net"
 )
 
-/*
-	https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
-	CIDR表示法:
-	IPv4   	网络号/前缀长度		192.168.1.0/24
-	IPv6	接口号/前缀长度		2001:db8::/64
-*/
+// CIDR https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 type CIDR struct {
 	ip    net.IP
 	ipnet *net.IPNet
 }
 
-// 解析CIDR网段
+// ParseCIDR parses s as a CIDR notation IP address and mask length,
+// like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291
 func ParseCIDR(s string) (*CIDR, error) {
 	i, n, err := net.ParseCIDR(s)
 	if err != nil {
@@ -28,65 +24,60 @@ func ParseCIDR(s string) (*CIDR, error) {
 	return &CIDR{ip: i, ipnet: n}, nil
 }
 
-// 判断网段是否相等
+// Equal reports whether cidr and ns are the same CIDR
 func (c CIDR) Equal(ns string) bool {
 	c2, err := ParseCIDR(ns)
 	if err != nil {
 		return false
 	}
-	return c.ipnet.IP.Equal(c2.ipnet.IP) /* && c.ipnet.IP.Equal(c2.ip) */
+	return c.ipnet.IP.Equal(c2.ipnet.IP)
 }
 
-// 判断是否IPv4
+// IsIPv4 reports whether the CIDR is IPv4
 func (c CIDR) IsIPv4() bool {
 	_, bits := c.ipnet.Mask.Size()
 	return bits/8 == net.IPv4len
 }
 
-// 判断是否IPv6
+// IsIPv6 reports whether the CIDR is IPv6
 func (c CIDR) IsIPv6() bool {
 	_, bits := c.ipnet.Mask.Size()
 	return bits/8 == net.IPv6len
 }
 
-// 判断IP是否包含在网段中
+// Contains reports whether the CIDR includes ip
 func (c CIDR) Contains(ip string) bool {
 	return c.ipnet.Contains(net.ParseIP(ip))
 }
 
-// 根据子网掩码长度校准后的CIDR
+// CIDR returns the CIDR string. If the IP prefix of the input CIDR string is inaccurate, it returns the string which be corrected by the mask length. For example, "192.0.2.10/24" return "192.0.2.0/24"
 func (c CIDR) CIDR() string {
 	return c.ipnet.String()
 }
 
-// CIDR字符串中的IP部分
+// IP returns the original IP prefix of the input CIDR
 func (c CIDR) IP() string {
 	return c.ip.String()
 }
 
-// 网络号
+// Network returns network of the CIDR
 func (c CIDR) Network() string {
 	return c.ipnet.IP.String()
 }
 
-// 子网掩码位数
+// MaskSize returns the number of leading ones and total bits in the CIDR mask
 func (c CIDR) MaskSize() (ones, bits int) {
 	ones, bits = c.ipnet.Mask.Size()
 	return
 }
 
-// 子网掩码
+// Mask returns mask of the CIDR
 func (c CIDR) Mask() string {
 	mask, _ := hex.DecodeString(c.ipnet.Mask.String())
 	return net.IP([]byte(mask)).String()
 }
 
-// [Deprecated] 网关地址，无法计算出来，可以是网段中任意IP地址
-func (c CIDR) Gateway() string {
-	return ""
-}
-
-// 广播地址(网段最后一个IP)
+// Broadcast returns broadcast of the CIDR
 func (c CIDR) Broadcast() string {
 	mask := c.ipnet.Mask
 	bcst := make(net.IP, len(c.ipnet.IP))
@@ -98,18 +89,18 @@ func (c CIDR) Broadcast() string {
 	return bcst.String()
 }
 
-// 起始IP、结束IP
-func (c CIDR) IPRange() (start, end string) {
+// IPRange returns begin and end ip of the CIDR
+func (c CIDR) IPRange() (begin, end string) {
 	return c.Network(), c.Broadcast()
 }
 
-// IP数量
+// IPCount returns ip total of the CIDR
 func (c CIDR) IPCount() *big.Int {
 	ones, bits := c.ipnet.Mask.Size()
 	return big.NewInt(0).Lsh(big.NewInt(1), uint(bits-ones))
 }
 
-// 遍历网段下所有IP
+// ForEachIP iterate through each ip in the CIDR
 func (c CIDR) ForEachIP(iterator func(ip string) error) error {
 	next := make(net.IP, len(c.ipnet.IP))
 	copy(next, c.ipnet.IP)
@@ -122,7 +113,7 @@ func (c CIDR) ForEachIP(iterator func(ip string) error) error {
 	return nil
 }
 
-// 从指定IP开始遍历网段下后续的IP
+// ForEachIPBeginWith begin with specified ip, iterate through each ip in the CIDR
 func (c CIDR) ForEachIPBeginWith(beginIP string, iterator func(ip string) error) error {
 	next := net.ParseIP(beginIP)
 	for c.ipnet.Contains(next) {
@@ -134,36 +125,37 @@ func (c CIDR) ForEachIPBeginWith(beginIP string, iterator func(ip string) error)
 	return nil
 }
 
-// 裂解子网的方式
 const (
-	SUBNETTING_METHOD_SUBNET_NUM = 0 // 基于子网数量
-	SUBNETTING_METHOD_HOST_NUM   = 1 // 基于主机数量
+	SUBNETTING_METHOD_SUBNET_NUM = 0
+	SUBNETTING_METHOD_HOST_NUM   = 1
 )
 
-// 裂解网段
+// SubNetting split network segment based on the number of hosts or subnets
 func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 	if num < 1 || (num&(num-1)) != 0 {
-		return nil, fmt.Errorf("裂解数量必须是2的次方")
+		return nil, fmt.Errorf("num must the power of 2")
 	}
 
 	newOnes := int(math.Log2(float64(num)))
 	ones, bits := c.MaskSize()
 	switch method {
 	default:
-		return nil, fmt.Errorf("不支持的裂解方式")
+		return nil, fmt.Errorf("unsupported method")
+
 	case SUBNETTING_METHOD_SUBNET_NUM:
 		newOnes = ones + newOnes
-		// 如果子网的掩码长度大于父网段的长度，则无法裂解
+		// can't split when subnet mask greater than parent mask
 		if newOnes > bits {
 			return nil, nil
 		}
+
 	case SUBNETTING_METHOD_HOST_NUM:
 		newOnes = bits - newOnes
-		// 如果子网的掩码长度小于等于父网段的掩码长度，则无法裂解
+		// can't split when subnet mask not greater than parent mask
 		if newOnes <= ones {
 			return nil, nil
 		}
-		// 主机数量转换为子网数量
+		// calculate subnet num by host num
 		num = int(math.Pow(float64(2), float64(newOnes-ones)))
 	}
 
@@ -173,8 +165,6 @@ func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 	for i := 0; i < num; i++ {
 		cidr, _ := ParseCIDR(fmt.Sprintf("%v/%v", network.String(), newOnes))
 		cidrs = append(cidrs, cidr)
-
-		// 广播地址的下一个IP即为下一段的网络号
 		network = net.ParseIP(cidr.Broadcast())
 		IncrIP(network)
 	}
@@ -182,45 +172,44 @@ func (c CIDR) SubNetting(method, num int) ([]*CIDR, error) {
 	return cidrs, nil
 }
 
-// 合并网段
+// SuperNetting merge network segments, must be contiguous
 func SuperNetting(ns []string) (*CIDR, error) {
 	num := len(ns)
 	if num < 1 || (num&(num-1)) != 0 {
-		return nil, fmt.Errorf("子网数量必须是2的次方")
+		return nil, fmt.Errorf("ns length must the power of 2")
 	}
 
 	mask := ""
-	cidrs := []*CIDR{}
+	cidrs := make([]*CIDR, 0, num)
 	for _, n := range ns {
-		// 检查子网CIDR有效性
 		c, err := ParseCIDR(n)
 		if err != nil {
-			return nil, fmt.Errorf("网段%v格式错误", n)
+			return nil, fmt.Errorf("invalid CIDR format:%v", n)
 		}
 		cidrs = append(cidrs, c)
 
-		// TODO 暂只考虑相同子网掩码的网段合并
+		// TODO only network segments with the same mask are supported
 		if len(mask) == 0 {
 			mask = c.Mask()
 		} else if c.Mask() != mask {
-			return nil, fmt.Errorf("子网掩码不一致")
+			return nil, fmt.Errorf("not the same mask")
 		}
 	}
 	AscSortCIDRs(cidrs)
 
-	// 检查网段是否连续
+	// check whether contiguous segments
 	var network net.IP
 	for _, c := range cidrs {
 		if len(network) > 0 {
 			if !network.Equal(c.ipnet.IP) {
-				return nil, fmt.Errorf("必须是连续的网段")
+				return nil, fmt.Errorf("not the contiguous segments")
 			}
 		}
 		network = net.ParseIP(c.Broadcast())
 		IncrIP(network)
 	}
 
-	// 子网掩码左移，得到共同的父网段
+	// calculate parent segment by mask
 	c := cidrs[0]
 	ones, bits := c.MaskSize()
 	ones = ones - int(math.Log2(float64(num)))

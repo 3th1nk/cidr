@@ -1,45 +1,58 @@
 # CIDR
 
-## 基于Golang net包封装了CIDR网段和IP的常用处理方法
+## Features
+* easy to iterate through each ip in segment
+* check ipv4 or ipv6 segment
+* check whether segment contain ip
+* segments sort、split、merge
+* ip incr & decr
+* ip compare
 
-    import "github.com/3th1nk/cidr"
+## Code Example
+```
+package main
 
-## 举个栗子
+import (
+	"fmt"
+	"github.com/3th1nk/cidr"
+)
 
-    c, _ := cidr.ParseCIDR("192.168.1.0/24")
-    fmt.Println(c.Network())
-    fmt.Println(c.Broadcast())
+func main() {
+	// parses a network segment as a CIDR
+	c, _ := cidr.ParseCIDR("192.168.1.0/28")
+	fmt.Println("network:", c.Network())
+	fmt.Println("broadcast:", c.Broadcast())
 
-	start, end := c.IPRange()
-	fmt.Println(c.IPCount(), start, end)
+	// ip range
+	beginIP, endIP := c.IPRange()
+	fmt.Println("ip range:", beginIP, endIP)
 
-    if err := c.ForEachIP(func(ip string) error {
-        // do something
-        return nil
-    }); err != nil {
-        fmt.Println(err)
-    }
+	// iterate through each ip
+	fmt.Println("ip total:", c.IPCount())
+	c.ForEachIP(func(ip string) error {
+		fmt.Println(ip)
+		return nil
+	})
 
-## 网段裂解
+	// split network segment based on the subnets number
+	cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
+	for _, c := range cs {
+		fmt.Println("split network", c.CIDR())
+	}
 
-    # 基于子网数量划分子网段
-    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_SUBNET_NUM, 4)
-    for _, c := range cs {
-        fmt.Println(c.CIDR())
-    }
+	// split network segment based on the hosts number in the subnet
+	cs, _ = c.SubNetting(cidr.SUBNETTING_METHOD_HOST_NUM, 4)
+	for _, c := range cs {
+		fmt.Println("split2 network", c.CIDR())
+	}
 
-    # 基于主机数量划分子网段
-    cs, _ := c.SubNetting(cidr.SUBNETTING_METHOD_HOST_NUM, 64)
-    for _, c := range cs {
-        fmt.Println(c.CIDR())
-    }
-
-## 网段合并
-
-    c, _ := cidr.SuperNetting([]string{
-        "2001:db8::/66",
-        "2001:db8:0:0:8000::/66",
-        "2001:db8:0:0:4000::/66",
-        "2001:db8:0:0:c000::/66",
-    })
-    fmt.Println(c.CIDR())
+	// merge network segments
+	c, _ = cidr.SuperNetting([]string{
+		"2001:db8::/66",
+		"2001:db8:0:0:8000::/66",
+		"2001:db8:0:0:4000::/66",
+		"2001:db8:0:0:c000::/66",
+	})
+	fmt.Println("merge network", c.CIDR())
+}
+```

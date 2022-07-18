@@ -35,14 +35,6 @@ func TestMask(t *testing.T) {
 	fmt.Println(c2.Mask())
 }
 
-func TestGateway(t *testing.T) {
-	c1, _ := cidr.ParseCIDR("192.168.1.0/24")
-	fmt.Println(c1.Gateway())
-
-	c2, _ := cidr.ParseCIDR("2001:db8::/64")
-	fmt.Println(c2.Gateway())
-}
-
 func TestBroadcast(t *testing.T) {
 	c1, _ := cidr.ParseCIDR("192.168.2.0/24")
 	fmt.Println(c1.Broadcast())
