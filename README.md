@@ -28,9 +28,13 @@ func main() {
 
 	// iterate through each ip
 	fmt.Println("ip total:", c.IPCount())
-	c.Each(func(ip string) error {
+	c.Each(func(ip string) bool {
 		fmt.Println("\t", ip)
-		return nil
+		return true
+	})
+	c.EachFrom("192.168.1.10", func(ip string) bool {
+		fmt.Println("\t", ip)
+		return true
 	})
 
 	fmt.Println("subnet plan based on the subnets num:")
