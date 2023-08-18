@@ -75,6 +75,12 @@ func (c CIDR) Network() net.IP {
 	return c.ipNet.IP
 }
 
+// return network string
+func (c CIDR) String() string {
+	ones, _ := c.MaskSize()
+	return fmt.Sprintf("%s/%v", c.IP().String(), ones)
+}
+
 // MaskSize returns the number of leading ones and total bits in the CIDR mask
 func (c CIDR) MaskSize() (ones, bits int) {
 	ones, bits = c.ipNet.Mask.Size()
@@ -180,6 +186,27 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 	copy(network, c.ipNet.IP)
 	for i := 0; i < num; i++ {
 		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), newOnes))
+		cidrArr = append(cidrArr, cidr)
+		network = cidr.Broadcast()
+		IPIncr(network)
+	}
+
+	return cidrArr, nil
+}
+
+// SubNet split network segment based on a new subnet prefix
+// If split via prefix_diff, use Subnetting() instead
+func (c CIDR) SubNet(newPrefix int) ([]*CIDR, error) {
+	oldPrefix, _ := c.ipNet.Mask.Size()
+	if newPrefix <= oldPrefix {
+		return nil, fmt.Errorf("new prefix should be greater than the old one")
+	}
+	num := int(math.Pow(float64(2), float64(newPrefix-oldPrefix)))
+	cidrArr := make([]*CIDR, 0, num)
+	network := make(net.IP, len(c.ipNet.IP))
+	copy(network, c.ipNet.IP)
+	for i := 0; i < num; i++ {
+		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), newPrefix))
 		cidrArr = append(cidrArr, cidr)
 		network = cidr.Broadcast()
 		IPIncr(network)

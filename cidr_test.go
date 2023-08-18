@@ -1,6 +1,7 @@
 package cidr
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -70,6 +71,37 @@ func TestSubNetting(t *testing.T) {
 	t.Log(c3.CIDR(), "按主机数量划分:")
 	for _, c := range cs3 {
 		t.Log(c.CIDR())
+	}
+}
+
+func TestSubNet(t *testing.T) {
+	c1 := ParseNoError("192.168.1.0/24")
+	cs1, _ := c1.SubNet(25)
+	assert.Equal(t, 2, len(cs1))
+	assert.Equal(t, "192.168.1.0", cs1[0].IP().String())
+	ones, bits := cs1[0].MaskSize()
+	assert.Equal(t, 25, ones)
+	assert.Equal(t, 32, bits)
+	assert.Equal(t, "192.168.1.128", cs1[1].IP().String())
+
+	csErr, err := c1.SubNet(23)
+	assert.Equal(t, 0, len(csErr))
+	assert.Errorf(t, err, "")
+
+	c2 := ParseNoError("2001:db8::/64")
+	cs2, _ := c2.SubNet(68)
+	assert.Equal(t, 16, len(cs2))
+}
+
+func TestCidrString(t *testing.T) {
+	var cd *CIDR
+	for _, cs := range []string{"192.168.1.0/24", "192.168.1.1/24", "192.168.1.1/32"} {
+		cd = ParseNoError(cs)
+		assert.Equal(t, cs, cd.String())
+	}
+	for _, cs := range []string{"2001:db8::/64", "2001:db8::/128"} {
+		cd = ParseNoError(cs)
+		assert.Equal(t, cs, cd.String())
 	}
 }
 
