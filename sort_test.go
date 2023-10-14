@@ -2,7 +2,7 @@ package cidr
 
 import "testing"
 
-func TestSortCIDRAsc(t *testing.T) {
+func TestSortCIDR(t *testing.T) {
 	var arr = []*CIDR{
 		ParseNoError("192.168.1.192/26"),
 		ParseNoError("192.168.1.0/26"),

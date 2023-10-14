@@ -59,10 +59,15 @@ func (c CIDR) Contains(ip string) bool {
 	return c.ipNet.Contains(ipObj)
 }
 
-// CIDR returns the CIDR string. If the IP prefix of the input CIDR string is inaccurate, it returns the string which be corrected by the mask length.
+// CIDR return the CIDR which ip prefix be corrected by the mask length.
 //	For example, "192.0.2.10/24" return "192.0.2.0/24"
 func (c CIDR) CIDR() *net.IPNet {
 	return c.ipNet
+}
+
+// String returns the CIDR string
+func (c CIDR) String() string {
+	return c.ipNet.String()
 }
 
 // IP returns the original IP prefix of the input CIDR
@@ -144,42 +149,50 @@ const (
 	MethodSubnetNum = SubNettingMethod(0)
 	// MethodHostNum SubNetting based on the number of hosts
 	MethodHostNum = SubNettingMethod(1)
+	// MethodSubnetMask SubNetting based on the mask prefix length of subnets
+	MethodSubnetMask = SubNettingMethod(2)
 )
 
 // SubNetting split network segment based on the number of hosts or subnets
 func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
-	if num < 1 || (num&(num-1)) != 0 {
-		return nil, fmt.Errorf("num must the power of 2")
-	}
-
-	newOnes := int(math.Log2(float64(num)))
+	var newOnes float64
 	ones, bits := c.MaskSize()
 	switch method {
 	default:
 		return nil, fmt.Errorf("unsupported method")
 
 	case MethodSubnetNum:
-		newOnes = ones + newOnes
-		// can't split when subnet mask greater than parent mask
-		if newOnes > bits {
-			return nil, nil
+		if num < 1 || (num&(num-1)) != 0 {
+			return nil, fmt.Errorf("num must the power of 2")
 		}
+
+		newOnes = float64(ones) + math.Log2(float64(num))
+
+	case MethodSubnetMask:
+		newOnes = float64(num)
 
 	case MethodHostNum:
-		newOnes = bits - newOnes
-		// can't split when subnet mask not greater than parent mask
-		if newOnes <= ones {
-			return nil, nil
+		if num < 1 || (num&(num-1)) != 0 {
+			return nil, fmt.Errorf("num must the power of 2")
 		}
-		// calculate subnet num by host num
-		num = int(math.Pow(float64(2), float64(newOnes-ones)))
+
+		newOnes = float64(bits) - math.Log2(float64(num))
 	}
 
-	cidrArr := make([]*CIDR, 0, num)
+	// can't split when subnet mask greater than parent mask
+	if newOnes < float64(ones) || newOnes > float64(bits) {
+		return nil, fmt.Errorf("num must be between %v and %v", ones, bits)
+	}
+
+	// calculate subnet num
+	// !!! if ones delta is too large, it will cause big memory allocation, even make slice panic when integer overflow !!!
+	subnetNum := int(math.Pow(float64(2), newOnes-float64(ones)))
+
+	cidrArr := make([]*CIDR, 0, subnetNum)
 	network := make(net.IP, len(c.ipNet.IP))
 	copy(network, c.ipNet.IP)
-	for i := 0; i < num; i++ {
-		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), newOnes))
+	for i := 0; i < subnetNum; i++ {
+		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), int(newOnes)))
 		cidrArr = append(cidrArr, cidr)
 		network = cidr.Broadcast()
 		IPIncr(network)

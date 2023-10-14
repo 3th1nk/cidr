@@ -1,6 +1,7 @@
 package cidr
 
 import (
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -52,7 +53,7 @@ func TestIPRange(t *testing.T) {
 
 func TestSubNetting(t *testing.T) {
 	c1 := ParseNoError("192.168.1.0/24")
-	cs1, _ := c1.SubNetting(MethodSubnetNum, 256)
+	cs1, _ := c1.SubNetting(MethodSubnetNum, 4)
 	t.Log(c1.CIDR(), "按子网数量划分:")
 	for _, c := range cs1 {
 		t.Log(c.CIDR())
@@ -69,6 +70,22 @@ func TestSubNetting(t *testing.T) {
 	cs3, _ := c3.SubNetting(MethodHostNum, 64)
 	t.Log(c3.CIDR(), "按主机数量划分:")
 	for _, c := range cs3 {
+		t.Log(c.CIDR())
+	}
+
+	c4 := ParseNoError("192.168.1.0/24")
+	cs4, err := c4.SubNetting(MethodSubnetMask, 26)
+	assert.NoError(t, err)
+	t.Log(c4.CIDR(), "按子网掩码划分:")
+	for _, c := range cs4 {
+		t.Log(c.CIDR())
+	}
+
+	c5 := ParseNoError("2001:db8::/64")
+	cs5, err := c5.SubNetting(MethodSubnetMask, 66)
+	assert.NoError(t, err)
+	t.Log(c5.CIDR(), "按子网掩码划分:")
+	for _, c := range cs5 {
 		t.Log(c.CIDR())
 	}
 }
