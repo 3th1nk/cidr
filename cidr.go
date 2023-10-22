@@ -60,7 +60,7 @@ func (c CIDR) Contains(ip string) bool {
 }
 
 // CIDR return the CIDR which ip prefix be corrected by the mask length.
-//	For example, "192.0.2.10/24" return "192.0.2.0/24"
+// For example, "192.0.2.10/24" return "192.0.2.0/24"
 func (c CIDR) CIDR() *net.IPNet {
 	return c.ipNet
 }
@@ -90,6 +90,20 @@ func (c CIDR) MaskSize() (ones, bits int) {
 func (c CIDR) Mask() net.IP {
 	mask, _ := hex.DecodeString(c.ipNet.Mask.String())
 	return mask
+}
+
+// Gateway returns a gateway of the CIDR
+func (c CIDR) Gateway() net.IP {
+	if c.IsIPv4() {
+		ip4 := c.ip.To4()
+		ip4[3]++
+		return ip4
+	} else if c.IsIPv6() {
+		ip6 := c.ip.To16()
+		ip6[15]++
+		return ip6
+	}
+	return nil
 }
 
 // Broadcast returns broadcast of the CIDR
