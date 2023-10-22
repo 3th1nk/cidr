@@ -1,8 +1,9 @@
 package cidr
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestEach(t *testing.T) {
@@ -35,6 +36,14 @@ func TestBroadcast(t *testing.T) {
 
 	c2 := ParseNoError("2001:db8::/64")
 	t.Log(c2.Broadcast())
+}
+
+func TestGateway(t *testing.T) {
+	c1 := ParseNoError("192.168.2.0/28")
+	t.Log(c1.Gateway())
+
+	c2 := ParseNoError("2001:db8::/64")
+	t.Log(c2.Gateway())
 }
 
 func TestIPRange(t *testing.T) {
