@@ -123,6 +123,9 @@ func (c CIDR) Each(iterator func(ip string) bool) {
 		if !iterator(next.String()) {
 			break
 		}
+		if next.Equal(c.Broadcast()) {
+			break
+		}
 		IPIncr(next)
 	}
 }
@@ -135,6 +138,9 @@ func (c CIDR) EachFrom(beginIP string, iterator func(ip string) bool) error {
 	}
 	for c.ipNet.Contains(next) {
 		if !iterator(next.String()) {
+			break
+		}
+		if next.Equal(c.Broadcast()) {
 			break
 		}
 		IPIncr(next)
