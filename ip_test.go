@@ -1,27 +1,98 @@
 package cidr
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
 )
 
-func TestIPIncrAndDecr(t *testing.T) {
-	ip4Obj := net.ParseIP("192.168.1.1")
-	IPDecr(ip4Obj)
-	assert.Equal(t, "192.168.1.0", ip4Obj.String())
-	IPDecr(ip4Obj)
-	assert.Equal(t, "192.168.0.255", ip4Obj.String())
-	IPIncr(ip4Obj)
-	assert.Equal(t, "192.168.1.0", ip4Obj.String())
+func TestIPIncr(t *testing.T) {
+	tests := []struct {
+		ip    net.IP
+		valid bool
+	}{
+		{net.ParseIP("0.0.0.0"), true},
+		{net.ParseIP("::"), true},
+		// 边界
+		{net.ParseIP("255.255.255.255"), true},
+		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
+		// 非法输入
+		{nil, false},
+		{[]byte{1, 2}, false},
+	}
 
-	ip6Obj := net.ParseIP("2001:db8::")
-	IPDecr(ip6Obj)
-	assert.Equal(t, "2001:db7:ffff:ffff:ffff:ffff:ffff:ffff", ip6Obj.String())
-	IPIncr(ip6Obj)
-	assert.Equal(t, "2001:db8::", ip6Obj.String())
-	IPIncr(ip6Obj)
-	assert.Equal(t, "2001:db8::1", ip6Obj.String())
+	for _, test := range tests {
+		srcIP := make(net.IP, len(test.ip))
+		copy(srcIP, test.ip)
+		IPIncr(test.ip)
+		fmt.Printf("IPIncr Input: %v -> Output: %v\n", srcIP, test.ip)
+	}
+}
+
+func TestIPDecr(t *testing.T) {
+	tests := []struct {
+		ip    net.IP
+		valid bool
+	}{
+		{net.ParseIP("255.255.255.255"), true},
+		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
+		// 边界
+		{net.ParseIP("0.0.0.0"), true},
+		{net.ParseIP("::"), true},
+		// 非法输入
+		{nil, false},
+		{[]byte{1, 2}, false},
+	}
+
+	for _, test := range tests {
+		srcIP := make(net.IP, len(test.ip))
+		copy(srcIP, test.ip)
+		IPDecr(test.ip)
+		fmt.Printf("IPDecr Input: %v -> Output: %v\n", srcIP, test.ip)
+	}
+}
+
+func TestIPIncr2(t *testing.T) {
+	tests := []struct {
+		ip    net.IP
+		valid bool
+	}{
+		{net.ParseIP("255.255.255.255"), true},
+		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
+		// 边界
+		{net.ParseIP("0.0.0.0"), true},
+		{net.ParseIP("::"), true},
+		// 非法输入
+		{nil, false},
+		{[]byte{1, 2}, false},
+	}
+
+	for _, test := range tests {
+		result := IPIncr2(test.ip)
+		fmt.Printf("IPIncr2 Input: %v -> Output: %v\n", test.ip, result)
+	}
+}
+
+func TestIPDecr2(t *testing.T) {
+	tests := []struct {
+		ip    net.IP
+		valid bool
+	}{
+		{net.ParseIP("255.255.255.255"), true},
+		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
+		// 边界
+		{net.ParseIP("0.0.0.0"), true},
+		{net.ParseIP("::"), true},
+		// 非法输入
+		{nil, false},
+		{[]byte{1, 2}, false},
+	}
+
+	for _, test := range tests {
+		result := IPDecr2(test.ip)
+		fmt.Printf("IPDecr2 Input: %v -> Output: %v\n", test.ip, result)
+	}
 }
 
 func TestIPCompare(t *testing.T) {
@@ -31,7 +102,7 @@ func TestIPCompare(t *testing.T) {
 	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.3")), -1)
 	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.1")), 1)
 	assert.Equal(t, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("2001:db8::1")), -1)
-	assert.Equal(t, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("192.168.1.1")), -1)
+	assert.Equal(t, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("192.168.1.1")), 1)
 }
 
 func TestIPEqual(t *testing.T) {

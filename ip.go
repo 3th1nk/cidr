@@ -8,42 +8,127 @@ import (
 	"strings"
 )
 
+func fillIPBytes(ip net.IP, start, end int, fill byte) {
+	if start > end {
+		return
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(ip) {
+		end = len(ip) - 1
+	}
+	for i := start; i <= end; i++ {
+		ip[i] = fill
+	}
+}
+
+func toIPv4Zero(ip net.IP) {
+	fillIPBytes(ip, 0, 10, 0)
+	fillIPBytes(ip, 10, 11, 0xFF)
+	fillIPBytes(ip, 11, 15, 0)
+}
+
+func toIPv4Broadcast(ip net.IP) {
+	fillIPBytes(ip, 0, 10, 0)
+	fillIPBytes(ip, 10, 15, 0xFF)
+}
+
 // IPIncr ip increase
 func IPIncr(ip net.IP) {
+	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+		return
+	}
+
+	isV4 := ip.To4() != nil
 	for i := len(ip) - 1; i >= 0; i-- {
 		ip[i]++
 		if ip[i] > 0 {
 			break
 		}
 	}
+
+	if isV4 && ip.To4() == nil {
+		toIPv4Zero(ip)
+	}
 }
 
 // IPDecr ip decrease
 func IPDecr(ip net.IP) {
-	length := len(ip)
-	for i := length - 1; i >= 0; i-- {
-		ip[length-1]--
-		if ip[length-1] < 0xFF {
+	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+		return
+	}
+
+	isV4 := ip.To4() != nil
+	for i := len(ip) - 1; i >= 0; i-- {
+		if ip[i] > 0 {
+			ip[i]--
 			break
-		}
-		for j := 1; j < length; j++ {
-			ip[length-j-1]--
-			if ip[length-j-1] < 0xFF {
-				return
-			}
+		} else {
+			ip[i] = 0xFF
 		}
 	}
+
+	if isV4 && ip.To4() == nil {
+		toIPv4Broadcast(ip)
+	}
+}
+
+// IPIncr2 input ip no change
+func IPIncr2(ip net.IP) net.IP {
+	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+		return nil
+	}
+
+	ipCopy := make(net.IP, len(ip))
+	copy(ipCopy, ip)
+
+	for i := len(ipCopy) - 1; i >= 0; i-- {
+		ipCopy[i]++
+		if ipCopy[i] > 0 {
+			break
+		}
+	}
+
+	if ip.To4() != nil && ipCopy.To4() == nil {
+		toIPv4Zero(ipCopy)
+	}
+	return ipCopy
+}
+
+// IPDecr2 input ip no change
+func IPDecr2(ip net.IP) net.IP {
+	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+		return nil
+	}
+
+	ipCopy := make(net.IP, len(ip))
+	copy(ipCopy, ip)
+
+	for i := len(ipCopy) - 1; i >= 0; i-- {
+		if ipCopy[i] > 0 {
+			ipCopy[i]--
+			break
+		} else {
+			ipCopy[i] = 0xFF
+		}
+	}
+
+	if ip.To4() != nil && ipCopy.To4() == nil {
+		toIPv4Broadcast(ipCopy)
+	}
+	return ipCopy
 }
 
 // IPCompare returns an integer comparing two ip
 // 	The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 func IPCompare(a, b net.IP) int {
-	return bytes.Compare(a, b)
+	return bytes.Compare(a.To16(), b.To16())
 }
 
 // IPEqual reports whether a and b are the same IP
 func IPEqual(a, b net.IP) bool {
-	return bytes.Equal(a, b)
+	return bytes.Equal(a.To16(), b.To16())
 }
 
 // IP4StrToInt ipv4 ip to number

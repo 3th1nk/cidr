@@ -95,13 +95,13 @@ func (c CIDR) Mask() net.IP {
 // Broadcast returns broadcast of the CIDR
 func (c CIDR) Broadcast() net.IP {
 	mask := c.ipNet.Mask
-	bcst := make(net.IP, len(c.ipNet.IP))
-	copy(bcst, c.ipNet.IP)
+	bcast := make(net.IP, len(c.ipNet.IP))
+	copy(bcast, c.ipNet.IP)
 	for i := 0; i < len(mask); i++ {
-		ipIdx := len(bcst) - i - 1
-		bcst[ipIdx] = c.ipNet.IP[ipIdx] | ^mask[len(mask)-i-1]
+		ipIdx := len(bcast) - i - 1
+		bcast[ipIdx] = c.ipNet.IP[ipIdx] | ^mask[len(mask)-i-1]
 	}
-	return bcst
+	return bcast
 }
 
 // IPRange returns begin and end ip of the CIDR
