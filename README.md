@@ -20,11 +20,10 @@ import (
 func main() {
 	// parses a network segment as a CIDR
 	c, _ := cidr.Parse("192.168.1.0/28")
-	fmt.Println("network:", c.Network(), "broadcast:", c.Broadcast(), "mask", c.Mask())
+	fmt.Println("network:", c.Network(), "broadcast:", c.Broadcast(), "mask", net.IP(c.Mask()))
 
 	// ip range
-	beginIP, endIP := c.IPRange()
-	fmt.Println("ip range:", beginIP, endIP)
+	fmt.Println("ip range:", c.StartIP(), c.EndIP())
 
 	// iterate through each ip
 	fmt.Println("ip total:", c.IPCount())
@@ -40,13 +39,13 @@ func main() {
 	fmt.Println("subnet plan based on the subnets num:")
 	cs, _ := c.SubNetting(cidr.MethodSubnetNum, 4)
 	for _, c := range cs {
-		fmt.Println("\t", c.CIDR())
+		fmt.Println("\t", c.String())
 	}
 
 	fmt.Println("subnet plan based on the hosts num:")
 	cs, _ = c.SubNetting(cidr.MethodHostNum, 4)
 	for _, c := range cs {
-		fmt.Println("\t", c.CIDR())
+		fmt.Println("\t", c.String())
 	}
 
 	fmt.Println("merge network:")
@@ -56,6 +55,6 @@ func main() {
 		"2001:db8:0:0:4000::/66",
 		"2001:db8:0:0:c000::/66",
 	})
-	fmt.Println("\t", c.CIDR())
+	fmt.Println("\t", c.String())
 }
 ```
