@@ -96,13 +96,13 @@ func TestIPDecr2(t *testing.T) {
 }
 
 func TestIPCompare(t *testing.T) {
-	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.20")), -1)
-	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.10")), -1)
-	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.2")), 0)
-	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.3")), -1)
-	assert.Equal(t, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.1")), 1)
-	assert.Equal(t, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("2001:db8::1")), -1)
-	assert.Equal(t, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("192.168.1.1")), 1)
+	assert.Equal(t, -1, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.20")))
+	assert.Equal(t, -1, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.10")))
+	assert.Equal(t, 0, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.2")))
+	assert.Equal(t, -1, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.3")))
+	assert.Equal(t, 1, IPCompare(net.ParseIP("192.168.1.2"), net.ParseIP("192.168.1.1")))
+	assert.Equal(t, -1, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("2001:db8::1")))
+	assert.Equal(t, 1, IPCompare(net.ParseIP("2001:db8::"), net.ParseIP("192.168.1.1")))
 }
 
 func TestIPEqual(t *testing.T) {

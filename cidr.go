@@ -1,17 +1,25 @@
 package cidr
 
 import (
-	"encoding/hex"
+	"bytes"
 	"fmt"
 	"math"
 	"math/big"
 	"net"
+	"strings"
 )
+
+var (
+	bigIntOne = big.NewInt(1)
+)
+
+const maxSubnetNum = 65536 // 2^16, reasonable limit to prevent memory issues
 
 // CIDR https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 type CIDR struct {
-	ip    net.IP
-	ipNet *net.IPNet
+	ip       net.IP
+	ipNet    *net.IPNet
+	original string
 }
 
 // Parse parses s as a CIDR notation IP address and mask length,
@@ -21,33 +29,61 @@ func Parse(s string) (*CIDR, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CIDR{ip: i, ipNet: n}, nil
+	return &CIDR{ip: i, ipNet: n, original: s}, nil
 }
 
+// ParseNoError parses s as a CIDR notation IP address and mask length,
+// but ignores any error. Use with caution.
 func ParseNoError(s string) *CIDR {
 	c, _ := Parse(s)
 	return c
 }
 
-// Equal reports whether cidr and ns are the same CIDR
+// Equal reports whether cidr and ns are the same CIDR (excluding IPv4-mapped)
 func (c CIDR) Equal(ns string) bool {
 	c2, err := Parse(ns)
 	if err != nil {
 		return false
 	}
-	return c.ipNet.IP.Equal(c2.ipNet.IP)
+	return c.ipNet.IP.Equal(c2.ipNet.IP) && bytes.Equal(c.ipNet.Mask, c2.ipNet.Mask)
+}
+
+// EqualFold reports whether cidr and ns are the same CIDR (including IPv4-mapped)
+func (c CIDR) EqualFold(ns string) bool {
+	c2, err := Parse(ns)
+	if err != nil {
+		return false
+	}
+	return c.ipNet.String() == c2.ipNet.String()
 }
 
 // IsIPv4 reports whether the CIDR is IPv4
 func (c CIDR) IsIPv4() bool {
 	_, bits := c.ipNet.Mask.Size()
-	return bits/8 == net.IPv4len
+	return bits == 32
 }
 
-// IsIPv6 reports whether the CIDR is IPv6
+// IsIPv6 reports whether the CIDR is IPv6 (including IPv4-compatible and IPv4-mapped)
 func (c CIDR) IsIPv6() bool {
 	_, bits := c.ipNet.Mask.Size()
-	return bits/8 == net.IPv6len
+	return bits == 128
+}
+
+func isZeros(p net.IP) bool {
+	for i := 0; i < len(p); i++ {
+		if p[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// IsPureIPv6 reports whether the CIDR is IPv6 (excluding IPv4-compatible and IPv4-mapped)
+func (c CIDR) IsPureIPv6() bool {
+	if c.IsIPv6() {
+		return !strings.Contains(c.original, ".")
+	}
+	return false
 }
 
 // Contains reports whether the CIDR includes ip
@@ -59,88 +95,113 @@ func (c CIDR) Contains(ip string) bool {
 	return c.ipNet.Contains(ipObj)
 }
 
-// CIDR return the CIDR which ip prefix be corrected by the mask length.
-//	For example, "192.0.2.10/24" return "192.0.2.0/24"
+// CIDR returns the normalized network address based on the mask, not the original input.
+// 	For example, if the original input was "192.168.1.10/24", this returns a *net.IPNet representing "192.168.1.0/24".
 func (c CIDR) CIDR() *net.IPNet {
 	return c.ipNet
 }
 
-// String returns the CIDR string
+// String returns the normalized string representation of the CIDR
 func (c CIDR) String() string {
 	return c.ipNet.String()
 }
 
-// IP returns the original IP prefix of the input CIDR
+// IP returns the normalized IP prefix of the CIDR.
+// 	This method returns the IP address after processing IPv4-compatible and IPv4-mapped normalizations,
+// but unlike Network() method, it does not correct the IP prefix based on the mask.
+// 	For example, if the original input was "192.168.1.10/24", this returns "192.168.1.10",
+// while Network() would return "192.168.1.0" (the network address with host bits set to zero).
 func (c CIDR) IP() net.IP {
 	return c.ip
 }
 
-// Network returns network of the CIDR
+// Network returns the network address of the CIDR
 func (c CIDR) Network() net.IP {
 	return c.ipNet.IP
 }
 
-// MaskSize returns the number of leading ones and total bits in the CIDR mask
-func (c CIDR) MaskSize() (ones, bits int) {
-	ones, bits = c.ipNet.Mask.Size()
-	return
+// Mask returns the network mask of the CIDR as a net.IPMask.
+// 	Note that calling mask.String() directly returns a hex string without separators (e.g., "ffffff00"),
+// which is not human-readable.
+//	Use net.IP(mask).String() to get a human-readable representation:
+//	- for IPv4, dotted decimal notation (e.g., "255.255.255.0")
+//	- for IPv6, colon-separated hexadecimal notation (e.g., "ffff:ffff:ffff:ffff::")
+func (c CIDR) Mask() net.IPMask {
+	return c.ipNet.Mask
 }
 
-// Mask returns mask of the CIDR
-func (c CIDR) Mask() net.IP {
-	mask, _ := hex.DecodeString(c.ipNet.Mask.String())
-	return mask
+func isIPv4Mapped(ip net.IP) bool {
+	return isZeros(ip[:10]) && ip[10] == 0xFF && ip[11] == 0xFF
 }
 
-// Broadcast returns broadcast of the CIDR
+// Broadcast returns the broadcast address of the CIDR (only valid for IPv4)
 func (c CIDR) Broadcast() net.IP {
-	mask := c.ipNet.Mask
-	bcast := make(net.IP, len(c.ipNet.IP))
-	copy(bcast, c.ipNet.IP)
-	for i := 0; i < len(mask); i++ {
-		ipIdx := len(bcast) - i - 1
-		bcast[ipIdx] = c.ipNet.IP[ipIdx] | ^mask[len(mask)-i-1]
+	if c.IsIPv6() {
+		if isIPv4Mapped(c.ipNet.IP) {
+			return c.EndIP()
+		}
+		return nil
 	}
-	return bcast
+	return c.EndIP()
 }
 
-// IPRange returns begin and end ip of the CIDR
-func (c CIDR) IPRange() (begin, end net.IP) {
-	return c.Network(), c.Broadcast()
+// StartIP returns the start IP of the CIDR
+func (c CIDR) StartIP() net.IP {
+	return c.ipNet.IP
 }
 
-// IPCount returns ip total of the CIDR
+// EndIP returns the end IP of the CIDR
+func (c CIDR) EndIP() net.IP {
+	ip := make(net.IP, len(c.ipNet.IP))
+	copy(ip, c.ipNet.IP)
+	mask := c.ipNet.Mask
+	for i := 0; i < len(mask); i++ {
+		ipIdx := len(ip) - i - 1
+		ip[ipIdx] = c.ipNet.IP[ipIdx] | ^mask[len(mask)-i-1]
+	}
+	return ip
+}
+
+// IPRange returns the start and end IP of the CIDR
+func (c CIDR) IPRange() (start, end net.IP) {
+	return c.StartIP(), c.EndIP()
+}
+
+// IPCount returns the number of IPs in the CIDR
 func (c CIDR) IPCount() *big.Int {
 	ones, bits := c.ipNet.Mask.Size()
-	return big.NewInt(0).Lsh(big.NewInt(1), uint(bits-ones))
+	shift := uint(bits - ones)
+	return big.NewInt(0).Lsh(bigIntOne, shift)
 }
 
-// Each iterate through each ip in the CIDR
+// Each iterates over all IPs in the CIDR
 func (c CIDR) Each(iterator func(ip string) bool) {
 	next := make(net.IP, len(c.ipNet.IP))
 	copy(next, c.ipNet.IP)
+	endIP := c.EndIP()
 	for c.ipNet.Contains(next) {
 		if !iterator(next.String()) {
 			break
 		}
-		if next.Equal(c.Broadcast()) {
+		if next.Equal(endIP) {
 			break
 		}
 		IPIncr(next)
 	}
 }
 
-// EachFrom begin with specified ip, iterate through each ip in the CIDR
+// EachFrom iterates over all IPs in the CIDR from a given IP
 func (c CIDR) EachFrom(beginIP string, iterator func(ip string) bool) error {
 	next := net.ParseIP(beginIP)
 	if next == nil {
 		return fmt.Errorf("invalid begin ip")
 	}
+	endIP := c.EndIP()
 	for c.ipNet.Contains(next) {
 		if !iterator(next.String()) {
 			break
 		}
-		if next.Equal(c.Broadcast()) {
+		if next.Equal(endIP) {
 			break
 		}
 		IPIncr(next)
@@ -161,8 +222,8 @@ const (
 
 // SubNetting split network segment based on the number of hosts or subnets
 func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
-	var newOnes float64
-	ones, bits := c.MaskSize()
+	var newOnes int
+	ones, bits := c.ipNet.Mask.Size()
 	switch method {
 	default:
 		return nil, fmt.Errorf("unsupported method")
@@ -171,36 +232,36 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 		if num < 1 || (num&(num-1)) != 0 {
 			return nil, fmt.Errorf("num must the power of 2")
 		}
-
-		newOnes = float64(ones) + math.Log2(float64(num))
+		newOnes = ones + int(math.Log2(float64(num)))
 
 	case MethodSubnetMask:
-		newOnes = float64(num)
+		newOnes = num
 
 	case MethodHostNum:
 		if num < 1 || (num&(num-1)) != 0 {
 			return nil, fmt.Errorf("num must the power of 2")
 		}
-
-		newOnes = float64(bits) - math.Log2(float64(num))
+		newOnes = bits - int(math.Log2(float64(num)))
 	}
 
 	// can't split when subnet mask greater than parent mask
-	if newOnes < float64(ones) || newOnes > float64(bits) {
+	if newOnes < ones || newOnes > bits {
 		return nil, fmt.Errorf("num must be between %v and %v", ones, bits)
 	}
 
 	// calculate subnet num
-	// !!! if ones delta is too large, it will cause big memory allocation, even make slice panic when integer overflow !!!
-	subnetNum := int(math.Pow(float64(2), newOnes-float64(ones)))
+	subnetNum := 1 << uint(newOnes-ones)
+	if subnetNum > maxSubnetNum {
+		return nil, fmt.Errorf("subnet number %d exceeds maximum limit of %d", subnetNum, maxSubnetNum)
+	}
 
 	cidrArr := make([]*CIDR, 0, subnetNum)
 	network := make(net.IP, len(c.ipNet.IP))
 	copy(network, c.ipNet.IP)
 	for i := 0; i < subnetNum; i++ {
-		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), int(newOnes)))
+		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), newOnes))
 		cidrArr = append(cidrArr, cidr)
-		network = cidr.Broadcast()
+		network = cidr.EndIP()
 		IPIncr(network)
 	}
 
@@ -214,7 +275,7 @@ func SuperNetting(ns []string) (*CIDR, error) {
 		return nil, fmt.Errorf("ns length must the power of 2")
 	}
 
-	mask := ""
+	var mask string
 	cidrs := make([]*CIDR, 0, num)
 	for _, n := range ns {
 		c, err := Parse(n)
@@ -240,13 +301,13 @@ func SuperNetting(ns []string) (*CIDR, error) {
 				return nil, fmt.Errorf("not the contiguous segments")
 			}
 		}
-		network = c.Broadcast()
+		network = c.EndIP()
 		IPIncr(network)
 	}
 
 	// calculate parent segment by mask
 	c := cidrs[0]
-	ones, bits := c.MaskSize()
+	ones, bits := c.ipNet.Mask.Size()
 	ones = ones - int(math.Log2(float64(num)))
 	c.ipNet.Mask = net.CIDRMask(ones, bits)
 	c.ipNet.IP.Mask(c.ipNet.Mask)

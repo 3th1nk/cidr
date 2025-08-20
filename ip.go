@@ -2,21 +2,20 @@ package cidr
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 )
 
 func fillIPBytes(ip net.IP, start, end int, fill byte) {
-	if start > end {
-		return
-	}
 	if start < 0 {
 		start = 0
 	}
-	if end > len(ip) {
+	if end >= len(ip) {
 		end = len(ip) - 1
+	}
+	if start > end {
+		return
 	}
 	for i := start; i <= end; i++ {
 		ip[i] = fill
@@ -128,38 +127,27 @@ func IPCompare(a, b net.IP) int {
 
 // IPEqual reports whether a and b are the same IP
 func IPEqual(a, b net.IP) bool {
-	return bytes.Equal(a.To16(), b.To16())
+	return IPCompare(a, b) == 0
 }
 
 // IP4StrToInt ipv4 ip to number
 func IP4StrToInt(s string) int64 {
 	obj := net.ParseIP(s)
-	if obj == nil || len(obj.To4()) != net.IPv4len {
+	if obj == nil || obj.To4() == nil {
 		return 0
 	}
-
-	bits := strings.Split(obj.String(), ".")
-	b0, _ := strconv.Atoi(bits[0])
-	b1, _ := strconv.Atoi(bits[1])
-	b2, _ := strconv.Atoi(bits[2])
-	b3, _ := strconv.Atoi(bits[3])
-
-	var sum int64
-	sum += int64(b0) << 24
-	sum += int64(b1) << 16
-	sum += int64(b2) << 8
-	sum += int64(b3)
-	return sum
+	ip4 := obj.To4()
+	return int64(binary.BigEndian.Uint32(ip4))
 }
 
 // IP4IntToStr number to ipv4 ip
 func IP4IntToStr(n int64) string {
-	var b [4]byte
-	b[0] = byte(n & 0xFF)
-	b[1] = byte((n >> 8) & 0xFF)
-	b[2] = byte((n >> 16) & 0xFF)
-	b[3] = byte((n >> 24) & 0xFF)
-	return net.IPv4(b[3], b[2], b[1], b[0]).String()
+	if n < 0 || n > 0xFFFFFFFF {
+		return ""
+	}
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, uint32(n))
+	return net.IP(buf).String()
 }
 
 // IP4Distance return the number of ip between two v4 ip
@@ -174,5 +162,8 @@ func IP4Distance(src, dst string) (int64, error) {
 		return 0, fmt.Errorf("invalid v4 ip: %v", dst)
 	}
 
-	return IP4StrToInt(dstIp.String()) - IP4StrToInt(srcIp.String()), nil
+	srcInt := IP4StrToInt(srcIp.String())
+	dstInt := IP4StrToInt(dstIp.String())
+
+	return dstInt - srcInt, nil
 }

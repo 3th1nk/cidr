@@ -12,12 +12,12 @@ func TestSortCIDR(t *testing.T) {
 	t.Log("order by asc:")
 	SortCIDRAsc(arr)
 	for _, c := range arr {
-		t.Log(c.CIDR())
+		t.Log(c.String())
 	}
 
 	t.Log("order by desc:")
 	SortCIDRDesc(arr)
 	for _, c := range arr {
-		t.Log(c.CIDR())
+		t.Log(c.String())
 	}
 }
