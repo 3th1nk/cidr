@@ -1,7 +1,6 @@
 package cidr
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
@@ -9,90 +8,110 @@ import (
 
 func TestIPIncr(t *testing.T) {
 	tests := []struct {
-		ip    net.IP
-		valid bool
+		name     string
+		ip       net.IP
+		expected string
 	}{
-		{net.ParseIP("0.0.0.0"), true},
-		{net.ParseIP("::"), true},
 		// 边界
-		{net.ParseIP("255.255.255.255"), true},
-		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
+		{"v4 zero", net.ParseIP("0.0.0.0"), "0.0.0.1"},
+		{"v6 zero", net.ParseIP("::"), "::1"},
+		{"v4 max", net.ParseIP("255.255.255.255"), "0.0.0.0"},
+		{"v6 max", net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "::"},
+		// 4 字节形式的 v4
+		{"v4 4-byte", net.IP{0xc0, 0xa8, 0x0, 0xff}, "192.168.1.0"},
 		// 非法输入
-		{nil, false},
-		{[]byte{1, 2}, false},
+		{"nil", nil, "<nil>"},
+		{"invalid len", net.IP{1, 2}, "?0102"},
 	}
 
 	for _, test := range tests {
-		srcIP := make(net.IP, len(test.ip))
-		copy(srcIP, test.ip)
-		IPIncr(test.ip)
-		fmt.Printf("IPIncr Input: %v -> Output: %v\n", srcIP, test.ip)
+		t.Run(test.name, func(t *testing.T) {
+			IPIncr(test.ip)
+			assert.Equal(t, test.expected, test.ip.String())
+		})
 	}
 }
 
 func TestIPDecr(t *testing.T) {
 	tests := []struct {
-		ip    net.IP
-		valid bool
+		name     string
+		ip       net.IP
+		expected string
 	}{
-		{net.ParseIP("255.255.255.255"), true},
-		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
 		// 边界
-		{net.ParseIP("0.0.0.0"), true},
-		{net.ParseIP("::"), true},
+		{"v4 max", net.ParseIP("255.255.255.255"), "255.255.255.254"},
+		{"v6 max", net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe"},
+		{"v4 zero", net.ParseIP("0.0.0.0"), "255.255.255.255"},
+		{"v6 zero", net.ParseIP("::"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"},
+		// 4 字节形式的 v4
+		{"v4 4-byte", net.IP{0xc0, 0xa8, 0x1, 0x0}, "192.168.0.255"},
 		// 非法输入
-		{nil, false},
-		{[]byte{1, 2}, false},
+		{"nil", nil, "<nil>"},
+		{"invalid len", net.IP{1, 2}, "?0102"},
 	}
 
 	for _, test := range tests {
-		srcIP := make(net.IP, len(test.ip))
-		copy(srcIP, test.ip)
-		IPDecr(test.ip)
-		fmt.Printf("IPDecr Input: %v -> Output: %v\n", srcIP, test.ip)
+		t.Run(test.name, func(t *testing.T) {
+			IPDecr(test.ip)
+			assert.Equal(t, test.expected, test.ip.String())
+		})
 	}
 }
 
 func TestIPIncr2(t *testing.T) {
 	tests := []struct {
-		ip    net.IP
-		valid bool
+		name     string
+		ip       net.IP
+		expected string
 	}{
-		{net.ParseIP("255.255.255.255"), true},
-		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
 		// 边界
-		{net.ParseIP("0.0.0.0"), true},
-		{net.ParseIP("::"), true},
-		// 非法输入
-		{nil, false},
-		{[]byte{1, 2}, false},
+		{"v4 max", net.ParseIP("255.255.255.255"), "0.0.0.0"},
+		{"v6 max", net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "::"},
+		{"v4 zero", net.ParseIP("0.0.0.0"), "0.0.0.1"},
+		{"v6 zero", net.ParseIP("::"), "::1"},
 	}
 
 	for _, test := range tests {
-		result := IPIncr2(test.ip)
-		fmt.Printf("IPIncr2 Input: %v -> Output: %v\n", test.ip, result)
+		t.Run(test.name, func(t *testing.T) {
+			src := test.ip.String()
+			result := IPIncr2(test.ip)
+			assert.Equal(t, test.expected, result.String())
+			// 输入不被修改
+			assert.Equal(t, src, test.ip.String())
+		})
 	}
+
+	// 非法输入返回 nil
+	assert.Nil(t, IPIncr2(nil))
+	assert.Nil(t, IPIncr2(net.IP{1, 2}))
 }
 
 func TestIPDecr2(t *testing.T) {
 	tests := []struct {
-		ip    net.IP
-		valid bool
+		name     string
+		ip       net.IP
+		expected string
 	}{
-		{net.ParseIP("255.255.255.255"), true},
-		{net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), true},
 		// 边界
-		{net.ParseIP("0.0.0.0"), true},
-		{net.ParseIP("::"), true},
-		// 非法输入
-		{nil, false},
-		{[]byte{1, 2}, false},
+		{"v4 zero", net.ParseIP("0.0.0.0"), "255.255.255.255"},
+		{"v6 zero", net.ParseIP("::"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"},
+		{"v4 max", net.ParseIP("255.255.255.255"), "255.255.255.254"},
+		{"v6 max", net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), "ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe"},
 	}
 
 	for _, test := range tests {
-		result := IPDecr2(test.ip)
-		fmt.Printf("IPDecr2 Input: %v -> Output: %v\n", test.ip, result)
+		t.Run(test.name, func(t *testing.T) {
+			src := test.ip.String()
+			result := IPDecr2(test.ip)
+			assert.Equal(t, test.expected, result.String())
+			// 输入不被修改
+			assert.Equal(t, src, test.ip.String())
+		})
 	}
+
+	// 非法输入返回 nil
+	assert.Nil(t, IPDecr2(nil))
+	assert.Nil(t, IPDecr2(net.IP{1, 2}))
 }
 
 func TestIPCompare(t *testing.T) {

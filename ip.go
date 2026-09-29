@@ -22,14 +22,15 @@ func fillIPBytes(ip net.IP, start, end int, fill byte) {
 	}
 }
 
+// ::ffff:w.x.y.z 前 10 字节清零,10-11 字节置 0xFF,后 4 字节按需填充
 func toIPv4Zero(ip net.IP) {
-	fillIPBytes(ip, 0, 10, 0)
+	fillIPBytes(ip, 0, 9, 0)
 	fillIPBytes(ip, 10, 11, 0xFF)
-	fillIPBytes(ip, 11, 15, 0)
+	fillIPBytes(ip, 12, 15, 0)
 }
 
 func toIPv4Broadcast(ip net.IP) {
-	fillIPBytes(ip, 0, 10, 0)
+	fillIPBytes(ip, 0, 9, 0)
 	fillIPBytes(ip, 10, 15, 0xFF)
 }
 

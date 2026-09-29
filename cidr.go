@@ -190,11 +190,15 @@ func (c CIDR) Each(iterator func(ip string) bool) {
 	}
 }
 
-// EachFrom iterates over all IPs in the CIDR from a given IP
+// EachFrom iterates over all IPs in the CIDR from a given IP.
+// It returns an error if beginIP is invalid or not within the CIDR.
 func (c CIDR) EachFrom(beginIP string, iterator func(ip string) bool) error {
 	next := net.ParseIP(beginIP)
 	if next == nil {
 		return fmt.Errorf("invalid begin ip")
+	}
+	if !c.ipNet.Contains(next) {
+		return fmt.Errorf("begin ip %v is not in the cidr", beginIP)
 	}
 	endIP := c.EndIP()
 	for c.ipNet.Contains(next) {
@@ -250,6 +254,11 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 	}
 
 	// calculate subnet num
+	// check before shifting: shift over 16 exceeds maxSubnetNum (2^16),
+	// and 1<<64+ would silently overflow int to 0
+	if newOnes-ones > 16 {
+		return nil, fmt.Errorf("subnet number exceeds maximum limit of %d", maxSubnetNum)
+	}
 	subnetNum := 1 << uint(newOnes-ones)
 	if subnetNum > maxSubnetNum {
 		return nil, fmt.Errorf("subnet number %d exceeds maximum limit of %d", subnetNum, maxSubnetNum)
@@ -310,7 +319,8 @@ func SuperNetting(ns []string) (*CIDR, error) {
 	ones, bits := c.ipNet.Mask.Size()
 	ones = ones - int(math.Log2(float64(num)))
 	c.ipNet.Mask = net.CIDRMask(ones, bits)
-	c.ipNet.IP.Mask(c.ipNet.Mask)
+	// net.IP.Mask returns a new IP, it does not modify in place
+	c.ipNet.IP = c.ipNet.IP.Mask(c.ipNet.Mask)
 
 	return c, nil
 }
