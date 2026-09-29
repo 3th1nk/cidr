@@ -52,6 +52,9 @@ func TestCIDR_Equal(t *testing.T) {
 	assert.Equal(t, true, c.EqualFold("192.168.1.0/24"))
 	assert.Equal(t, false, c.Equal("192.168.1.0/25"))
 	assert.Equal(t, false, c.Equal("::ffff:192.168.1.0/121"))
+
+	// 非法输入返回 false
+	assert.Equal(t, false, c.Equal("bad"))
 }
 
 func TestCIDR_Each(t *testing.T) {
@@ -125,6 +128,75 @@ func TestCIDR_EachFrom_OutOfRange(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, 1, count4)
+
+	// 错误类型可通过 errors.Is 判断
+	assert.ErrorIs(t, c.EachFrom("bad", func(ip string) bool { return true }), ErrInvalidIP)
+	assert.ErrorIs(t, c.EachFrom("10.0.0.1", func(ip string) bool { return true }), ErrIPNotInCIDR)
+
+	// 网段中间起始:应从起始 IP 迭代到广播地址(230~255 共 26 个)
+	var count5 int
+	err = c.EachFrom("192.168.1.230", func(ip string) bool {
+		count5++
+		return true
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, 26, count5)
+
+	// iterator 返回 false 提前退出
+	count5 = 0
+	_ = c.EachFrom("192.168.1.230", func(ip string) bool {
+		count5++
+		return count5 < 5
+	})
+	assert.Equal(t, 5, count5)
+}
+
+func TestCIDR_EqualNormalized(t *testing.T) {
+	c, err := Parse("::ffff:192.168.1.0/120")
+	assert.Nil(t, err)
+	// 与 EqualFold 行为一致:归一化后比较,含 IPv4-mapped 等价
+	assert.Equal(t, c.EqualFold("192.168.1.0/24"), c.EqualNormalized("192.168.1.0/24"))
+	assert.Equal(t, true, c.EqualNormalized("192.168.1.0/24"))
+	assert.Equal(t, false, c.EqualNormalized("192.168.1.0/25"))
+	assert.Equal(t, false, c.EqualNormalized("bad"))
+}
+
+func TestCIDR_Contains(t *testing.T) {
+	tests := []struct {
+		cidr string
+		ip   string
+		want bool
+	}{
+		{"192.168.1.0/24", "192.168.1.0", true},         // 网络地址
+		{"192.168.1.0/24", "192.168.1.255", true},       // 广播地址
+		{"192.168.1.0/24", "192.168.2.1", false},        // 范围外
+		{"2001:db8::/32", "2001:db8::1", true},          // IPv6
+		{"2001:db8::/32", "2001:db9::1", false},         // IPv6 范围外
+		{"::ffff:192.168.1.0/120", "192.168.1.5", true}, // v4-mapped 等价
+		{"192.168.1.0/24", "bad", false},                // 非法 IP
+	}
+
+	for _, tt := range tests {
+		assert.Equalf(t, tt.want, ParseNoError(tt.cidr).Contains(tt.ip), "%v contains %v", tt.cidr, tt.ip)
+	}
+}
+
+func TestCIDR_IsIPv4(t *testing.T) {
+	assert.Equal(t, true, ParseNoError("192.168.1.0/24").IsIPv4())
+	assert.Equal(t, false, ParseNoError("2001:db8::/32").IsIPv4())
+	// IPv4-mapped 按 IPv6 处理(见 IsIPv6 文档)
+	assert.Equal(t, false, ParseNoError("::ffff:192.168.1.0/120").IsIPv4())
+}
+
+func TestCIDR_IPAndCIDRGetter(t *testing.T) {
+	// IP() 返回未按掩码修正的前缀
+	c, err := Parse("192.168.1.10/24")
+	assert.Nil(t, err)
+	assert.Equal(t, "192.168.1.10", c.IP().String())
+	// Network() 返回修正后的网络地址
+	assert.Equal(t, "192.168.1.0", c.Network().String())
+	// CIDR() 返回归一化的 *net.IPNet
+	assert.Equal(t, "192.168.1.0/24", c.CIDR().String())
 }
 
 func TestCIDR_Mask(t *testing.T) {
@@ -163,6 +235,95 @@ func TestCIDR_IPRange(t *testing.T) {
 	start3, end3 := c3.IPRange()
 	assert.Equal(t, "2000::", start3.String())
 	assert.Equal(t, "20ff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", end3.String())
+}
+
+func TestCIDR_SubNetting(t *testing.T) {
+	v4Subnets := []string{"192.168.1.0/26", "192.168.1.64/26", "192.168.1.128/26", "192.168.1.192/26"}
+	v6Subnets := []string{"2001:db8::/66", "2001:db8:0:0:4000::/66", "2001:db8:0:0:8000::/66", "2001:db8:0:0:c000::/66"}
+
+	tests := []struct {
+		name    string
+		cidr    string
+		method  SubNettingMethod
+		num     int
+		want    []string
+		wantErr error
+	}{
+		{name: "v4 by subnet num", cidr: "192.168.1.0/24", method: MethodSubnetNum, num: 4, want: v4Subnets},
+		{name: "v6 by subnet num", cidr: "2001:db8::/64", method: MethodSubnetNum, num: 4, want: v6Subnets},
+		{name: "v4 by host num", cidr: "192.168.1.0/24", method: MethodHostNum, num: 64, want: v4Subnets},
+		{name: "v4 by subnet mask", cidr: "192.168.1.0/24", method: MethodSubnetMask, num: 26, want: v4Subnets},
+		{name: "v6 by subnet mask", cidr: "2001:db8::/64", method: MethodSubnetMask, num: 66, want: v6Subnets},
+		// 非法输入
+		{name: "num not power of 2", cidr: "192.168.1.0/24", method: MethodSubnetNum, num: 3, wantErr: ErrInvalidNum},
+		{name: "num zero", cidr: "192.168.1.0/24", method: MethodSubnetNum, num: 0, wantErr: ErrInvalidNum},
+		{name: "num negative", cidr: "192.168.1.0/24", method: MethodSubnetNum, num: -1, wantErr: ErrInvalidNum},
+		{name: "host num not power of 2", cidr: "192.168.1.0/24", method: MethodHostNum, num: 3, wantErr: ErrInvalidNum},
+		{name: "unsupported method", cidr: "192.168.1.0/24", method: SubNettingMethod(99), num: 4, wantErr: ErrUnsupportedMethod},
+		{name: "mask less than parent", cidr: "192.168.1.0/24", method: MethodSubnetMask, num: 15, wantErr: ErrNumOutOfRange},
+		{name: "mask greater than bits", cidr: "192.168.1.0/24", method: MethodSubnetMask, num: 33, wantErr: ErrNumOutOfRange},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, err := ParseNoError(tt.cidr).SubNetting(tt.method, tt.num)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, cs)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, cidrStrings(cs))
+		})
+	}
+}
+
+func TestCIDR_SuperNetting(t *testing.T) {
+	tests := []struct {
+		name    string
+		ns      []string
+		want    string
+		wantErr error
+	}{
+		{
+			name: "v4",
+			ns:   []string{"192.168.1.0/26", "192.168.1.192/26", "192.168.1.128/26", "192.168.1.64/26"},
+			want: "192.168.1.0/24",
+		},
+		{
+			name: "v6",
+			ns:   []string{"2001:db8::/66", "2001:db8:0:0:8000::/66", "2001:db8:0:0:4000::/66", "2001:db8:0:0:c000::/66"},
+			want: "2001:db8::/64",
+		},
+		// 非法输入
+		{name: "empty", ns: nil, wantErr: ErrInvalidNum},
+		{name: "length not power of 2", ns: []string{"192.168.1.0/26", "192.168.1.64/26", "192.168.1.128/26"}, wantErr: ErrInvalidNum},
+		{name: "invalid cidr", ns: []string{"192.168.1.0/26", "bad"}, wantErr: ErrInvalidCIDR},
+		{name: "different mask", ns: []string{"192.168.1.0/26", "192.168.1.64/25"}, wantErr: ErrNotSameMask},
+		{name: "not contiguous", ns: []string{"192.168.1.0/26", "192.168.1.192/26"}, wantErr: ErrNotContiguous},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := SuperNetting(tt.ns)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				assert.Nil(t, c)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, c.String())
+		})
+	}
+}
+
+// cidrStrings returns the string representations of the CIDRs
+func cidrStrings(cs []*CIDR) []string {
+	ss := make([]string, 0, len(cs))
+	for _, c := range cs {
+		ss = append(ss, c.String())
+	}
+	return ss
 }
 
 func TestCIDR_SubNetting_ExceedLimit(t *testing.T) {

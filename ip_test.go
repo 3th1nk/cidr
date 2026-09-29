@@ -137,10 +137,34 @@ func TestIP4StrToInt(t *testing.T) {
 	assert.Equal(t, int64(0), IP4StrToInt("0.0.0.0"))
 }
 
+func TestIP4StrToIntErr(t *testing.T) {
+	n, err := IP4StrToIntErr("192.168.1.1")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(3232235777), n)
+
+	n, err = IP4StrToIntErr("0.0.0.0")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(0), n)
+
+	// 非法输入返回错误,与 0.0.0.0 可区分
+	n, err = IP4StrToIntErr("bad")
+	assert.ErrorIs(t, err, ErrInvalidIP)
+	assert.Equal(t, int64(0), n)
+
+	// IPv6 不是合法 v4
+	n, err = IP4StrToIntErr("2001:db8::1")
+	assert.ErrorIs(t, err, ErrInvalidIP)
+	assert.Equal(t, int64(0), n)
+}
+
 func TestIP4IntToStr(t *testing.T) {
 	assert.Equal(t, "192.168.1.1", IP4IntToStr(3232235777))
 	assert.Equal(t, "255.255.255.255", IP4IntToStr(4294967295))
 	assert.Equal(t, "0.0.0.0", IP4IntToStr(0))
+
+	// 超出 v4 范围返回空串
+	assert.Equal(t, "", IP4IntToStr(-1))
+	assert.Equal(t, "", IP4IntToStr(0x100000000))
 }
 
 func TestIP4Distance(t *testing.T) {
@@ -152,4 +176,15 @@ func TestIP4Distance(t *testing.T) {
 
 	n, _ = IP4Distance("192.168.0.255", "192.168.1.255")
 	assert.Equal(t, int64(256), n)
+
+	// 非法输入
+	_, err := IP4Distance("bad", "192.168.1.1")
+	assert.ErrorIs(t, err, ErrInvalidIP)
+
+	_, err = IP4Distance("192.168.1.1", "bad")
+	assert.ErrorIs(t, err, ErrInvalidIP)
+
+	// IPv6 不是合法 v4
+	_, err = IP4Distance("2001:db8::1", "192.168.1.1")
+	assert.ErrorIs(t, err, ErrInvalidIP)
 }
