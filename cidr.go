@@ -96,7 +96,8 @@ func (c CIDR) Contains(ip string) bool {
 }
 
 // CIDR returns the normalized network address based on the mask, not the original input.
-// 	For example, if the original input was "192.168.1.10/24", this returns a *net.IPNet representing "192.168.1.0/24".
+//
+//	For example, if the original input was "192.168.1.10/24", this returns a *net.IPNet representing "192.168.1.0/24".
 func (c CIDR) CIDR() *net.IPNet {
 	return c.ipNet
 }
@@ -107,9 +108,13 @@ func (c CIDR) String() string {
 }
 
 // IP returns the normalized IP prefix of the CIDR.
-// 	This method returns the IP address after processing IPv4-compatible and IPv4-mapped normalizations,
+//
+//	This method returns the IP address after processing IPv4-compatible and IPv4-mapped normalizations,
+//
 // but unlike Network() method, it does not correct the IP prefix based on the mask.
-// 	For example, if the original input was "192.168.1.10/24", this returns "192.168.1.10",
+//
+//	For example, if the original input was "192.168.1.10/24", this returns "192.168.1.10",
+//
 // while Network() would return "192.168.1.0" (the network address with host bits set to zero).
 func (c CIDR) IP() net.IP {
 	return c.ip
@@ -121,8 +126,11 @@ func (c CIDR) Network() net.IP {
 }
 
 // Mask returns the network mask of the CIDR as a net.IPMask.
-// 	Note that calling mask.String() directly returns a hex string without separators (e.g., "ffffff00"),
+//
+//	Note that calling mask.String() directly returns a hex string without separators (e.g., "ffffff00"),
+//
 // which is not human-readable.
+//
 //	Use net.IP(mask).String() to get a human-readable representation:
 //	- for IPv4, dotted decimal notation (e.g., "255.255.255.0")
 //	- for IPv6, colon-separated hexadecimal notation (e.g., "ffff:ffff:ffff:ffff::")
@@ -259,10 +267,7 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 	if newOnes-ones > 16 {
 		return nil, fmt.Errorf("subnet number exceeds maximum limit of %d", maxSubnetNum)
 	}
-	subnetNum := 1 << uint(newOnes-ones)
-	if subnetNum > maxSubnetNum {
-		return nil, fmt.Errorf("subnet number %d exceeds maximum limit of %d", subnetNum, maxSubnetNum)
-	}
+	subnetNum := 1 << uint(newOnes-ones) // shift <= 16, no overflow
 
 	cidrArr := make([]*CIDR, 0, subnetNum)
 	network := make(net.IP, len(c.ipNet.IP))

@@ -34,20 +34,39 @@ func toIPv4Broadcast(ip net.IP) {
 	fillIPBytes(ip, 10, 15, 0xFF)
 }
 
-// IPIncr ip increase
-func IPIncr(ip net.IP) {
-	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
-		return
-	}
+func validIP(ip net.IP) bool {
+	return ip != nil && (len(ip) == net.IPv4len || len(ip) == net.IPv6len)
+}
 
-	isV4 := ip.To4() != nil
+// incrBytes increments ip in place, wrapping around to all zeros on overflow
+func incrBytes(ip net.IP) {
 	for i := len(ip) - 1; i >= 0; i-- {
 		ip[i]++
 		if ip[i] > 0 {
 			break
 		}
 	}
+}
 
+// decrBytes decrements ip in place, wrapping around to all 0xFF on underflow
+func decrBytes(ip net.IP) {
+	for i := len(ip) - 1; i >= 0; i-- {
+		if ip[i] > 0 {
+			ip[i]--
+			break
+		}
+		ip[i] = 0xFF
+	}
+}
+
+// IPIncr ip increase
+func IPIncr(ip net.IP) {
+	if !validIP(ip) {
+		return
+	}
+
+	isV4 := ip.To4() != nil
+	incrBytes(ip)
 	if isV4 && ip.To4() == nil {
 		toIPv4Zero(ip)
 	}
@@ -55,20 +74,12 @@ func IPIncr(ip net.IP) {
 
 // IPDecr ip decrease
 func IPDecr(ip net.IP) {
-	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+	if !validIP(ip) {
 		return
 	}
 
 	isV4 := ip.To4() != nil
-	for i := len(ip) - 1; i >= 0; i-- {
-		if ip[i] > 0 {
-			ip[i]--
-			break
-		} else {
-			ip[i] = 0xFF
-		}
-	}
-
+	decrBytes(ip)
 	if isV4 && ip.To4() == nil {
 		toIPv4Broadcast(ip)
 	}
@@ -76,52 +87,31 @@ func IPDecr(ip net.IP) {
 
 // IPIncr2 input ip no change
 func IPIncr2(ip net.IP) net.IP {
-	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+	if !validIP(ip) {
 		return nil
 	}
 
 	ipCopy := make(net.IP, len(ip))
 	copy(ipCopy, ip)
-
-	for i := len(ipCopy) - 1; i >= 0; i-- {
-		ipCopy[i]++
-		if ipCopy[i] > 0 {
-			break
-		}
-	}
-
-	if ip.To4() != nil && ipCopy.To4() == nil {
-		toIPv4Zero(ipCopy)
-	}
+	IPIncr(ipCopy)
 	return ipCopy
 }
 
 // IPDecr2 input ip no change
 func IPDecr2(ip net.IP) net.IP {
-	if ip == nil || (len(ip) != net.IPv4len && len(ip) != net.IPv6len) {
+	if !validIP(ip) {
 		return nil
 	}
 
 	ipCopy := make(net.IP, len(ip))
 	copy(ipCopy, ip)
-
-	for i := len(ipCopy) - 1; i >= 0; i-- {
-		if ipCopy[i] > 0 {
-			ipCopy[i]--
-			break
-		} else {
-			ipCopy[i] = 0xFF
-		}
-	}
-
-	if ip.To4() != nil && ipCopy.To4() == nil {
-		toIPv4Broadcast(ipCopy)
-	}
+	IPDecr(ipCopy)
 	return ipCopy
 }
 
 // IPCompare returns an integer comparing two ip
-// 	The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
+//
+//	The result will be 0 if a==b, -1 if a < b, and +1 if a > b.
 func IPCompare(a, b net.IP) int {
 	return bytes.Compare(a.To16(), b.To16())
 }
