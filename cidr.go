@@ -38,6 +38,8 @@ var (
 	ErrInvalidRange = errors.New("invalid ip range")
 	// ErrNotSameFamily the CIDRs do not belong to the same address family
 	ErrNotSameFamily = errors.New("not the same address family")
+	// ErrInvalidMask the given string is not a valid contiguous netmask
+	ErrInvalidMask = errors.New("invalid netmask")
 )
 
 const maxSubnetNum = 65536 // 2^16, reasonable limit to prevent memory issues
@@ -233,6 +235,51 @@ func (c CIDR) Mask() net.IPMask {
 	return c.ipNet.Mask
 }
 
+// DottedMask returns the mask in human-readable form: dotted-decimal
+// notation for IPv4 (e.g. "255.255.255.0") or hex-colon notation
+// for IPv6 (e.g. "ffff:ffff::")
+func (c CIDR) DottedMask() string {
+	return net.IP(c.ipNet.Mask).String()
+}
+
+// WildcardMask returns the inverse of the network mask in dotted-decimal
+// notation (e.g. "0.0.0.255", as used in Cisco ACL configuration).
+// It returns an empty string for pure IPv6 CIDRs.
+func (c CIDR) WildcardMask() string {
+	mask := c.ipNet.Mask
+	if len(mask) == net.IPv6len {
+		if c.isV6Family() {
+			return ""
+		}
+		mask = mask[12:] // v4-mapped: take the low 32 bits
+	}
+	inv := make(net.IPMask, len(mask))
+	for i := range mask {
+		inv[i] = ^mask[i]
+	}
+	return net.IP(inv).String()
+}
+
+// MaskToPrefix converts a dotted-decimal (e.g. "255.255.255.0") or
+// hex-colon (e.g. "ffff:ffff::") netmask into a prefix length.
+// It returns an error wrapping ErrInvalidMask if s is not a valid
+// contiguous netmask.
+func MaskToPrefix(s string) (int, error) {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return 0, fmt.Errorf("%w: %v", ErrInvalidIP, s)
+	}
+	mask := net.IPMask(ip.To4())
+	if mask == nil {
+		mask = net.IPMask(ip.To16())
+	}
+	ones, total := mask.Size()
+	if total == 0 {
+		return 0, fmt.Errorf("%w: %v", ErrInvalidMask, s)
+	}
+	return ones, nil
+}
+
 func isIPv4Mapped(ip net.IP) bool {
 	return isZeros(ip[:10]) && ip[10] == 0xFF && ip[11] == 0xFF
 }
@@ -275,6 +322,50 @@ func (c CIDR) IPCount() *big.Int {
 	ones, bits := c.ipNet.Mask.Size()
 	shift := uint(bits - ones)
 	return big.NewInt(0).Lsh(bigIntOne, shift)
+}
+
+// HostCount returns the number of usable host addresses in the CIDR.
+// For IPv4 the network and broadcast addresses are excluded, except for
+// /31 (RFC 3021) and /32 which use all addresses; for IPv6 all addresses
+// are counted.
+func (c CIDR) HostCount() *big.Int {
+	count := c.IPCount()
+	if c.IsIPv4() {
+		ones, _ := c.ipNet.Mask.Size()
+		if ones >= 31 {
+			return count
+		}
+		return count.Sub(count, big.NewInt(2))
+	}
+	return count
+}
+
+// NthHost returns the n-th usable host address (0-based), following the
+// same host semantics as HostCount. It returns an error wrapping
+// ErrNumOutOfRange if n is negative or exceeds HostCount-1.
+func (c CIDR) NthHost(n int64) (net.IP, error) {
+	if n < 0 {
+		return nil, fmt.Errorf("%w: %d", ErrNumOutOfRange, n)
+	}
+	if hostCount := c.HostCount(); big.NewInt(n).Cmp(hostCount) >= 0 {
+		return nil, fmt.Errorf("%w: %d >= host count %v", ErrNumOutOfRange, n, hostCount)
+	}
+
+	b := c.ipNet.IP.To4()
+	size := 4
+	if b == nil {
+		b = c.ipNet.IP.To16()
+		size = 16
+	}
+	offset := big.NewInt(n)
+	if ones, _ := c.ipNet.Mask.Size(); c.IsIPv4() && ones < 31 {
+		offset.Add(offset, bigIntOne) // skip the network address
+	}
+	addr := new(big.Int).Add(new(big.Int).SetBytes(b), offset)
+	bs := addr.Bytes()
+	ip := make(net.IP, size)
+	copy(ip[size-len(bs):], bs)
+	return ip, nil
 }
 
 // Each iterates over all IPs in the CIDR
