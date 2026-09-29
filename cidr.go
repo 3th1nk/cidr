@@ -34,6 +34,10 @@ var (
 	ErrNotSameMask = errors.New("not the same mask")
 	// ErrNotContiguous the segments are not contiguous
 	ErrNotContiguous = errors.New("not contiguous segments")
+	// ErrInvalidRange the given IP range is invalid (bad order or cross-family)
+	ErrInvalidRange = errors.New("invalid ip range")
+	// ErrNotSameFamily the CIDRs do not belong to the same address family
+	ErrNotSameFamily = errors.New("not the same address family")
 )
 
 const maxSubnetNum = 65536 // 2^16, reasonable limit to prevent memory issues
