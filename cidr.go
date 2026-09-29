@@ -52,11 +52,12 @@ type CIDR struct {
 }
 
 // Parse parses s as a CIDR notation IP address and mask length,
-// like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC4632 and RFC4291
+// like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC4632 and RFC4291.
+// The returned error wraps ErrInvalidCIDR for invalid input.
 func Parse(s string) (*CIDR, error) {
 	i, n, err := net.ParseCIDR(s)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrInvalidCIDR, err)
 	}
 	return &CIDR{ip: i, ipNet: n, original: s}, nil
 }
@@ -217,6 +218,25 @@ func (c CIDR) CIDR() *net.IPNet {
 // String returns the normalized string representation of the CIDR
 func (c CIDR) String() string {
 	return c.ipNet.String()
+}
+
+// MarshalText implements encoding.TextMarshaler,
+// returning the normalized string representation.
+// As encoding/json uses TextMarshaler/TextUnmarshaler automatically,
+// CIDR values marshal to a JSON string like "192.168.1.0/24".
+func (c CIDR) MarshalText() ([]byte, error) {
+	return []byte(c.String()), nil
+}
+
+// UnmarshalText implements encoding.TextUnmarshaler,
+// parsing the text as a CIDR (see Parse).
+func (c *CIDR) UnmarshalText(b []byte) error {
+	c2, err := Parse(string(b))
+	if err != nil {
+		return err
+	}
+	*c = *c2
+	return nil
 }
 
 // IP returns the normalized IP prefix of the CIDR.
