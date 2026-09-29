@@ -86,7 +86,15 @@ func IPDecr(ip net.IP) {
 }
 
 // IPIncr2 input ip no change
+//
+// Deprecated: use IPIncrCopy instead, which has the same behavior and a clearer name.
 func IPIncr2(ip net.IP) net.IP {
+	return IPIncrCopy(ip)
+}
+
+// IPIncrCopy returns a copy of ip incremented by one, without modifying
+// the input. It returns nil for an invalid ip.
+func IPIncrCopy(ip net.IP) net.IP {
 	if !validIP(ip) {
 		return nil
 	}
@@ -98,7 +106,15 @@ func IPIncr2(ip net.IP) net.IP {
 }
 
 // IPDecr2 input ip no change
+//
+// Deprecated: use IPDecrCopy instead, which has the same behavior and a clearer name.
 func IPDecr2(ip net.IP) net.IP {
+	return IPDecrCopy(ip)
+}
+
+// IPDecrCopy returns a copy of ip decremented by one, without modifying
+// the input. It returns nil for an invalid ip.
+func IPDecrCopy(ip net.IP) net.IP {
 	if !validIP(ip) {
 		return nil
 	}

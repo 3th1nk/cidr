@@ -58,6 +58,38 @@ func TestIPDecr(t *testing.T) {
 	}
 }
 
+func TestIPIncrCopy(t *testing.T) {
+	src := net.ParseIP("192.168.1.255")
+	result := IPIncrCopy(src)
+	assert.Equal(t, "192.168.2.0", result.String())
+	// 输入不被修改
+	assert.Equal(t, "192.168.1.255", src.String())
+
+	// 边界回绕
+	assert.Equal(t, "0.0.0.0", IPIncrCopy(net.ParseIP("255.255.255.255")).String())
+	assert.Equal(t, "::", IPIncrCopy(net.ParseIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")).String())
+
+	// 非法输入返回 nil
+	assert.Nil(t, IPIncrCopy(nil))
+	assert.Nil(t, IPIncrCopy(net.IP{1, 2}))
+}
+
+func TestIPDecrCopy(t *testing.T) {
+	src := net.ParseIP("192.168.2.0")
+	result := IPDecrCopy(src)
+	assert.Equal(t, "192.168.1.255", result.String())
+	// 输入不被修改
+	assert.Equal(t, "192.168.2.0", src.String())
+
+	// 边界回绕
+	assert.Equal(t, "255.255.255.255", IPDecrCopy(net.ParseIP("0.0.0.0")).String())
+	assert.Equal(t, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", IPDecrCopy(net.ParseIP("::")).String())
+
+	// 非法输入返回 nil
+	assert.Nil(t, IPDecrCopy(nil))
+	assert.Nil(t, IPDecrCopy(net.IP{1, 2}))
+}
+
 func TestIPIncr2(t *testing.T) {
 	tests := []struct {
 		name     string

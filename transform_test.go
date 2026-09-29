@@ -7,30 +7,30 @@ import (
 
 func TestCIDR_Supernet(t *testing.T) {
 	// 向上卷
-	c, err := ParseNoError("192.168.1.0/24").Supernet(16)
+	c, err := MustParse("192.168.1.0/24").Supernet(16)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.0.0/16", c.String())
 
 	// host bits 会被掩掉
-	c, err = ParseNoError("192.168.1.130/25").Supernet(24)
+	c, err = MustParse("192.168.1.130/25").Supernet(24)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.1.0/24", c.String())
 
 	// 等值:原样返回
-	c, err = ParseNoError("192.168.1.0/24").Supernet(24)
+	c, err = MustParse("192.168.1.0/24").Supernet(24)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.1.0/24", c.String())
 
 	// IPv6
-	c, err = ParseNoError("2001:db8:1::/48").Supernet(32)
+	c, err = MustParse("2001:db8:1::/48").Supernet(32)
 	assert.NoError(t, err)
 	assert.Equal(t, "2001:db8::/32", c.String())
 
 	// 非法:newOnes 大于当前前缀或为负
-	_, err = ParseNoError("192.168.1.0/24").Supernet(25)
+	_, err = MustParse("192.168.1.0/24").Supernet(25)
 	assert.ErrorIs(t, err, ErrNumOutOfRange)
 
-	_, err = ParseNoError("192.168.1.0/24").Supernet(-1)
+	_, err = MustParse("192.168.1.0/24").Supernet(-1)
 	assert.ErrorIs(t, err, ErrNumOutOfRange)
 }
 
@@ -81,7 +81,7 @@ func TestCollapseCIDRs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := make([]*CIDR, 0, len(tt.in))
 			for _, s := range tt.in {
-				cs = append(cs, ParseNoError(s))
+				cs = append(cs, MustParse(s))
 			}
 			assert.Equal(t, tt.want, cidrStrings(CollapseCIDRs(cs)))
 		})
@@ -168,14 +168,13 @@ func TestSpanningCIDR(t *testing.T) {
 		// 非法输入
 		{name: "empty", in: nil, wantErr: ErrInvalidCIDR},
 		{name: "cross family", in: []string{"192.168.1.0/24", "2001:db8::/32"}, wantErr: ErrNotSameFamily},
-		{name: "invalid cidr", in: []string{"192.168.1.0/24", "bad"}, wantErr: ErrInvalidCIDR},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cs := make([]*CIDR, 0, len(tt.in))
 			for _, s := range tt.in {
-				cs = append(cs, ParseNoError(s))
+				cs = append(cs, MustParse(s))
 			}
 			c, err := SpanningCIDR(cs)
 			if tt.wantErr != nil {
@@ -187,6 +186,14 @@ func TestSpanningCIDR(t *testing.T) {
 			assert.Equal(t, tt.want, c.String())
 		})
 	}
+
+	// 列表中的 nil 元素
+	t.Run("nil element", func(t *testing.T) {
+		cs := []*CIDR{MustParse("192.168.1.0/24"), nil}
+		c, err := SpanningCIDR(cs)
+		assert.ErrorIs(t, err, ErrInvalidCIDR)
+		assert.Nil(t, c)
+	})
 }
 
 func TestCIDR_Exclude(t *testing.T) {
@@ -228,9 +235,9 @@ func TestCIDR_Exclude(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var sub *CIDR
 			if tt.sub != "" {
-				sub = ParseNoError(tt.sub)
+				sub = MustParse(tt.sub)
 			}
-			cs, err := ParseNoError(tt.cidr).Exclude(sub)
+			cs, err := MustParse(tt.cidr).Exclude(sub)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, cs)

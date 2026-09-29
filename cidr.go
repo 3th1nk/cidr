@@ -62,9 +62,24 @@ func Parse(s string) (*CIDR, error) {
 }
 
 // ParseNoError parses s as a CIDR notation IP address and mask length,
-// but ignores any error. Use with caution.
+// but ignores any error and returns nil on invalid input.
+//
+// Deprecated: use Parse and handle the error, or MustParse when the input
+// is known to be valid. ParseNoError returns nil for invalid input, which
+// may cause a nil pointer dereference.
 func ParseNoError(s string) *CIDR {
 	c, _ := Parse(s)
+	return c
+}
+
+// MustParse parses s as a CIDR notation IP address and mask length,
+// and panics on error. It is intended for use with constant inputs,
+// in tests and program initialization.
+func MustParse(s string) *CIDR {
+	c, err := Parse(s)
+	if err != nil {
+		panic(fmt.Sprintf("cidr: Parse(%q): %v", s, err))
+	}
 	return c
 }
 
@@ -459,7 +474,7 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 	network := make(net.IP, len(c.ipNet.IP))
 	copy(network, c.ipNet.IP)
 	for i := 0; i < subnetNum; i++ {
-		cidr := ParseNoError(fmt.Sprintf("%v/%v", network.String(), newOnes))
+		cidr := MustParse(fmt.Sprintf("%v/%v", network.String(), newOnes))
 		cidrArr = append(cidrArr, cidr)
 		network = cidr.EndIP()
 		IPIncr(network)

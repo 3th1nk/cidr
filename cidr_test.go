@@ -58,7 +58,7 @@ func TestCIDR_Equal(t *testing.T) {
 }
 
 func TestCIDR_Each(t *testing.T) {
-	c := ParseNoError("192.168.1.0/24")
+	c := MustParse("192.168.1.0/24")
 	var got []string
 	c.Each(func(ip string) bool {
 		got = append(got, ip)
@@ -77,7 +77,7 @@ func TestCIDR_Each(t *testing.T) {
 	assert.Equal(t, 10, count)
 
 	// 单 IP 网段(/32)
-	c32 := ParseNoError("192.168.1.1/32")
+	c32 := MustParse("192.168.1.1/32")
 	var got32 []string
 	c32.Each(func(ip string) bool {
 		got32 = append(got32, ip)
@@ -87,7 +87,7 @@ func TestCIDR_Each(t *testing.T) {
 }
 
 func TestCIDR_EachFrom_OutOfRange(t *testing.T) {
-	c := ParseNoError("192.168.1.0/24")
+	c := MustParse("192.168.1.0/24")
 
 	// beginIP 在网段之前,应返回错误且不迭代
 	var count1 int
@@ -177,15 +177,15 @@ func TestCIDR_Contains(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		assert.Equalf(t, tt.want, ParseNoError(tt.cidr).Contains(tt.ip), "%v contains %v", tt.cidr, tt.ip)
+		assert.Equalf(t, tt.want, MustParse(tt.cidr).Contains(tt.ip), "%v contains %v", tt.cidr, tt.ip)
 	}
 }
 
 func TestCIDR_IsIPv4(t *testing.T) {
-	assert.Equal(t, true, ParseNoError("192.168.1.0/24").IsIPv4())
-	assert.Equal(t, false, ParseNoError("2001:db8::/32").IsIPv4())
+	assert.Equal(t, true, MustParse("192.168.1.0/24").IsIPv4())
+	assert.Equal(t, false, MustParse("2001:db8::/32").IsIPv4())
 	// IPv4-mapped 按 IPv6 处理(见 IsIPv6 文档)
-	assert.Equal(t, false, ParseNoError("::ffff:192.168.1.0/120").IsIPv4())
+	assert.Equal(t, false, MustParse("::ffff:192.168.1.0/120").IsIPv4())
 }
 
 func TestCIDR_IPAndCIDRGetter(t *testing.T) {
@@ -200,38 +200,38 @@ func TestCIDR_IPAndCIDRGetter(t *testing.T) {
 }
 
 func TestCIDR_Mask(t *testing.T) {
-	c1 := ParseNoError("192.168.1.0/24")
+	c1 := MustParse("192.168.1.0/24")
 	assert.Equal(t, "ffffff00", c1.Mask().String())
 	assert.Equal(t, "255.255.255.0", net.IP(c1.Mask()).String())
 
-	c2 := ParseNoError("2001:db8::/64")
+	c2 := MustParse("2001:db8::/64")
 	assert.Equal(t, "ffffffffffffffff0000000000000000", c2.Mask().String())
 	assert.Equal(t, "ffff:ffff:ffff:ffff::", net.IP(c2.Mask()).String())
 }
 
 func TestCIDR_Broadcast(t *testing.T) {
-	c := ParseNoError("192.168.1.0/24")
+	c := MustParse("192.168.1.0/24")
 	assert.Equal(t, "192.168.1.255", c.Broadcast().String())
 
-	c = ParseNoError("2001:db8::/64")
+	c = MustParse("2001:db8::/64")
 	assert.Equal(t, net.IP(nil), c.Broadcast())
 
-	c = ParseNoError("::ffff:192.168.1.0/120")
+	c = MustParse("::ffff:192.168.1.0/120")
 	assert.Equal(t, "192.168.1.255", c.Broadcast().String())
 }
 
 func TestCIDR_IPRange(t *testing.T) {
-	c1 := ParseNoError("192.168.1.0/24")
+	c1 := MustParse("192.168.1.0/24")
 	start1, end1 := c1.IPRange()
 	assert.Equal(t, "192.168.1.0", start1.String())
 	assert.Equal(t, "192.168.1.255", end1.String())
 
-	c2 := ParseNoError("2001:db8::/64")
+	c2 := MustParse("2001:db8::/64")
 	start2, end2 := c2.IPRange()
 	assert.Equal(t, "2001:db8::", start2.String())
 	assert.Equal(t, "2001:db8::ffff:ffff:ffff:ffff", end2.String())
 
-	c3 := ParseNoError("2001:db8::/8")
+	c3 := MustParse("2001:db8::/8")
 	start3, end3 := c3.IPRange()
 	assert.Equal(t, "2000::", start3.String())
 	assert.Equal(t, "20ff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", end3.String())
@@ -266,7 +266,7 @@ func TestCIDR_SubNetting(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cs, err := ParseNoError(tt.cidr).SubNetting(tt.method, tt.num)
+			cs, err := MustParse(tt.cidr).SubNetting(tt.method, tt.num)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Nil(t, cs)
@@ -328,18 +328,18 @@ func cidrStrings(cs []*CIDR) []string {
 
 func TestCIDR_SubNetting_ExceedLimit(t *testing.T) {
 	// 拆分子网数量 2^64、2^32 超过上限,应返回错误而不是空结果
-	c1 := ParseNoError("2001:db8::/64")
+	c1 := MustParse("2001:db8::/64")
 	cs1, err := c1.SubNetting(MethodSubnetMask, 128)
 	assert.Error(t, err)
 	assert.Nil(t, cs1)
 
-	c2 := ParseNoError("::/0")
+	c2 := MustParse("::/0")
 	cs2, err := c2.SubNetting(MethodSubnetMask, 100)
 	assert.Error(t, err)
 	assert.Nil(t, cs2)
 
 	// 边界:/24 -> /32 拆出 256 个子网,恰好在上限内,应正常返回
-	c3 := ParseNoError("192.168.1.0/24")
+	c3 := MustParse("192.168.1.0/24")
 	cs3, err := c3.SubNetting(MethodSubnetMask, 32)
 	assert.NoError(t, err)
 	assert.Len(t, cs3, 256)
@@ -399,7 +399,7 @@ func TestCIDR_Overlaps(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		assert.Equalf(t, tt.want, ParseNoError(tt.a).Overlaps(ParseNoError(tt.b)), "%v overlaps %v", tt.a, tt.b)
+		assert.Equalf(t, tt.want, MustParse(tt.a).Overlaps(MustParse(tt.b)), "%v overlaps %v", tt.a, tt.b)
 	}
 }
 
@@ -418,7 +418,7 @@ func TestCIDR_IsSubnetOf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		assert.Equalf(t, tt.want, ParseNoError(tt.a).IsSubnetOf(ParseNoError(tt.b)), "%v is subnet of %v", tt.a, tt.b)
+		assert.Equalf(t, tt.want, MustParse(tt.a).IsSubnetOf(MustParse(tt.b)), "%v is subnet of %v", tt.a, tt.b)
 	}
 }
 
@@ -434,28 +434,28 @@ func TestCIDR_IsSupernetOf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		assert.Equalf(t, tt.want, ParseNoError(tt.a).IsSupernetOf(ParseNoError(tt.b)), "%v is supernet of %v", tt.a, tt.b)
+		assert.Equalf(t, tt.want, MustParse(tt.a).IsSupernetOf(MustParse(tt.b)), "%v is supernet of %v", tt.a, tt.b)
 	}
 }
 
 func TestCIDR_HostCount(t *testing.T) {
 	// IPv4 减去网络地址与广播地址
-	assert.Equal(t, int64(254), ParseNoError("192.168.1.0/24").HostCount().Int64())
-	assert.Equal(t, int64(126), ParseNoError("192.168.1.0/25").HostCount().Int64())
-	assert.Equal(t, int64(2), ParseNoError("192.168.1.0/30").HostCount().Int64())
+	assert.Equal(t, int64(254), MustParse("192.168.1.0/24").HostCount().Int64())
+	assert.Equal(t, int64(126), MustParse("192.168.1.0/25").HostCount().Int64())
+	assert.Equal(t, int64(2), MustParse("192.168.1.0/30").HostCount().Int64())
 	// RFC 3021:/31 点对点链路两个地址都可用;/32 单主机
-	assert.Equal(t, int64(2), ParseNoError("192.168.1.0/31").HostCount().Int64())
-	assert.Equal(t, int64(1), ParseNoError("192.168.1.1/32").HostCount().Int64())
+	assert.Equal(t, int64(2), MustParse("192.168.1.0/31").HostCount().Int64())
+	assert.Equal(t, int64(1), MustParse("192.168.1.1/32").HostCount().Int64())
 	// IPv6 全量计数,不减
-	assert.Equal(t, big.NewInt(0).Lsh(bigIntOne, 64), ParseNoError("2001:db8::/64").HostCount())
-	assert.Equal(t, int64(1), ParseNoError("2001:db8::1/128").HostCount().Int64())
+	assert.Equal(t, big.NewInt(0).Lsh(bigIntOne, 64), MustParse("2001:db8::/64").HostCount())
+	assert.Equal(t, int64(1), MustParse("2001:db8::1/128").HostCount().Int64())
 	// v4-mapped 段(128 位掩码)按 IPv6 语义全量计数
-	assert.Equal(t, int64(256), ParseNoError("::ffff:192.168.1.0/120").HostCount().Int64())
+	assert.Equal(t, int64(256), MustParse("::ffff:192.168.1.0/120").HostCount().Int64())
 }
 
 func TestCIDR_NthHost(t *testing.T) {
 	// IPv4 常规段:0 号主机为第一个可用地址(跳过网络地址)
-	c := ParseNoError("192.168.1.0/24")
+	c := MustParse("192.168.1.0/24")
 	ip, err := c.NthHost(0)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.1.1", ip.String())
@@ -469,7 +469,7 @@ func TestCIDR_NthHost(t *testing.T) {
 	assert.ErrorIs(t, err, ErrNumOutOfRange)
 
 	// /31:两个地址都可用,不跳过
-	c31 := ParseNoError("192.168.1.0/31")
+	c31 := MustParse("192.168.1.0/31")
 	ip, err = c31.NthHost(0)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.1.0", ip.String())
@@ -478,15 +478,15 @@ func TestCIDR_NthHost(t *testing.T) {
 	assert.Equal(t, "192.168.1.1", ip.String())
 
 	// /32:仅自身
-	ip, err = ParseNoError("192.168.1.1/32").NthHost(0)
+	ip, err = MustParse("192.168.1.1/32").NthHost(0)
 	assert.NoError(t, err)
 	assert.Equal(t, "192.168.1.1", ip.String())
 
 	// IPv6:从网络地址开始全量计数
-	ip, err = ParseNoError("2001:db8::/64").NthHost(0)
+	ip, err = MustParse("2001:db8::/64").NthHost(0)
 	assert.NoError(t, err)
 	assert.Equal(t, "2001:db8::", ip.String())
-	ip, err = ParseNoError("2001:db8::/64").NthHost(1)
+	ip, err = MustParse("2001:db8::/64").NthHost(1)
 	assert.NoError(t, err)
 	assert.Equal(t, "2001:db8::1", ip.String())
 
@@ -496,21 +496,21 @@ func TestCIDR_NthHost(t *testing.T) {
 }
 
 func TestCIDR_DottedMask(t *testing.T) {
-	assert.Equal(t, "255.255.255.0", ParseNoError("192.168.1.0/24").DottedMask())
-	assert.Equal(t, "255.255.255.255", ParseNoError("192.168.1.1/32").DottedMask())
-	assert.Equal(t, "ffff:ffff::", ParseNoError("2001:db8::/32").DottedMask())
-	assert.Equal(t, "ffff:ffff:ffff:ffff::", ParseNoError("2001:db8::/64").DottedMask())
+	assert.Equal(t, "255.255.255.0", MustParse("192.168.1.0/24").DottedMask())
+	assert.Equal(t, "255.255.255.255", MustParse("192.168.1.1/32").DottedMask())
+	assert.Equal(t, "ffff:ffff::", MustParse("2001:db8::/32").DottedMask())
+	assert.Equal(t, "ffff:ffff:ffff:ffff::", MustParse("2001:db8::/64").DottedMask())
 }
 
 func TestCIDR_WildcardMask(t *testing.T) {
-	assert.Equal(t, "0.0.0.255", ParseNoError("192.168.1.0/24").WildcardMask())
-	assert.Equal(t, "255.255.255.255", ParseNoError("0.0.0.0/0").WildcardMask())
-	assert.Equal(t, "0.0.0.0", ParseNoError("192.168.1.1/32").WildcardMask())
-	assert.Equal(t, "0.0.0.127", ParseNoError("192.168.1.0/25").WildcardMask())
+	assert.Equal(t, "0.0.0.255", MustParse("192.168.1.0/24").WildcardMask())
+	assert.Equal(t, "255.255.255.255", MustParse("0.0.0.0/0").WildcardMask())
+	assert.Equal(t, "0.0.0.0", MustParse("192.168.1.1/32").WildcardMask())
+	assert.Equal(t, "0.0.0.127", MustParse("192.168.1.0/25").WildcardMask())
 	// v4-mapped 取低 32 位
-	assert.Equal(t, "0.0.0.255", ParseNoError("::ffff:192.168.1.0/120").WildcardMask())
+	assert.Equal(t, "0.0.0.255", MustParse("::ffff:192.168.1.0/120").WildcardMask())
 	// 纯 IPv6 不支持
-	assert.Equal(t, "", ParseNoError("2001:db8::/64").WildcardMask())
+	assert.Equal(t, "", MustParse("2001:db8::/64").WildcardMask())
 }
 
 func TestMaskToPrefix(t *testing.T) {
@@ -541,6 +541,17 @@ func TestMaskToPrefix(t *testing.T) {
 		assert.NoErrorf(t, err, tt.mask)
 		assert.Equalf(t, tt.want, n, tt.mask)
 	}
+}
+
+func TestCIDR_MustParse(t *testing.T) {
+	// 合法输入
+	c := MustParse("192.168.1.0/24")
+	assert.Equal(t, "192.168.1.0/24", c.String())
+
+	// 非法输入应 panic
+	assert.Panics(t, func() {
+		MustParse("bad")
+	})
 }
 
 func TestCIDR_IsPureIPv6(t *testing.T) {
