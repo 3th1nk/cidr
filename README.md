@@ -79,3 +79,46 @@ func main() {
 	}
 }
 ```
+
+## More
+
+```go
+a := cidr.MustParse("192.168.1.0/24")
+b := cidr.MustParse("192.168.0.0/16")
+
+// relation checks
+a.Overlaps(b)    // true
+a.IsSubnetOf(b)  // true
+b.IsSupernetOf(a) // true
+
+// normalize & merge an arbitrary list (overlaps and gaps are fine)
+merged := cidr.CollapseCIDRs([]*cidr.CIDR{
+	cidr.MustParse("192.168.1.0/25"),
+	cidr.MustParse("192.168.1.128/25"),
+	cidr.MustParse("10.0.0.0/8"),
+})
+// ["10.0.0.0/8", "192.168.1.0/24"]
+
+// convert an IP range into the minimal list of CIDRs
+cidrs, _ := cidr.RangeToCIDRs("192.168.1.1", "192.168.1.10")
+
+// the smallest CIDR covering a set
+c, _ := cidr.SpanningCIDR([]*cidr.CIDR{a, b})
+
+// carve a subnet out and keep the rest
+rest, _ := a.Exclude(cidr.MustParse("192.168.1.64/26"))
+
+// usable hosts
+n := a.HostCount()   // 254
+h, _ := a.NthHost(0) // 192.168.1.1
+
+// masks
+a.DottedMask()   // "255.255.255.0"
+a.WildcardMask() // "0.0.0.255" (Cisco ACL)
+cidr.MaskToPrefix("255.255.255.0") // 24
+
+// interop with the standard library net/netip (Go 1.18+)
+p, _ := a.AsNetip() // netip.Prefix
+
+// JSON: CIDR values marshal to a string like "192.168.1.0/24"
+```
