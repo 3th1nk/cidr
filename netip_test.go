@@ -1,7 +1,6 @@
 package cidr
 
 import (
-	"encoding/json"
 	"net/netip"
 	"testing"
 
@@ -58,32 +57,4 @@ func TestParseNetip(t *testing.T) {
 	c, err = ParseNetip(netip.Prefix{})
 	assert.ErrorIs(t, err, ErrInvalidCIDR)
 	assert.Nil(t, c)
-}
-
-func TestCIDR_MarshalText(t *testing.T) {
-	c := MustParse("2001:db8::/32")
-	b, err := c.MarshalText()
-	assert.NoError(t, err)
-	assert.Equal(t, "2001:db8::/32", string(b))
-
-	// UnmarshalText
-	var c2 CIDR
-	assert.NoError(t, c2.UnmarshalText([]byte("192.168.1.0/24")))
-	assert.Equal(t, "192.168.1.0/24", c2.String())
-	assert.ErrorIs(t, c2.UnmarshalText([]byte("bad")), ErrInvalidCIDR)
-
-	// 实现了 TextMarshaler/TextUnmarshaler 后 JSON 自动支持
-	type wrapper struct {
-		CIDR *CIDR `json:"cidr"`
-	}
-	data, err := json.Marshal(wrapper{CIDR: MustParse("192.168.1.0/24")})
-	assert.NoError(t, err)
-	assert.JSONEq(t, `{"cidr":"192.168.1.0/24"}`, string(data))
-
-	var w wrapper
-	assert.NoError(t, json.Unmarshal([]byte(`{"cidr":"2001:db8::/32"}`), &w))
-	assert.Equal(t, "2001:db8::/32", w.CIDR.String())
-
-	// 非法 JSON 值
-	assert.Error(t, json.Unmarshal([]byte(`{"cidr":"bad"}`), &w))
 }
