@@ -38,6 +38,19 @@ func validIP(ip net.IP) bool {
 	return ip != nil && (len(ip) == net.IPv4len || len(ip) == net.IPv6len)
 }
 
+func isZeros(p net.IP) bool {
+	for i := 0; i < len(p); i++ {
+		if p[i] != 0 {
+			return false
+		}
+	}
+	return true
+}
+
+func isIPv4Mapped(ip net.IP) bool {
+	return isZeros(ip[:10]) && ip[10] == 0xFF && ip[11] == 0xFF
+}
+
 // incrBytes increments ip in place, wrapping around to all zeros on overflow
 func incrBytes(ip net.IP) {
 	for i := len(ip) - 1; i >= 0; i-- {
