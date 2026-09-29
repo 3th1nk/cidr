@@ -5,6 +5,11 @@
 * check ipv4 or ipv6 segment
 * check whether segment contain ip
 * segments sort, split, merge
+* relation checks: `Overlaps`, `IsSubnetOf`, `IsSupernetOf`
+* set operations: `CollapseCIDRs` (normalize & merge), `RangeToCIDRs`,
+  `SpanningCIDR`, `Exclude`
+* usable hosts: `HostCount`, `NthHost`
+* masks: `DottedMask`, `WildcardMask`, `MaskToPrefix`
 * ip incr & decr
 * ip compare
 * errors checkable via `errors.Is`
