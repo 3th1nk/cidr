@@ -2,6 +2,7 @@ package cidr
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -11,6 +12,28 @@ import (
 
 var (
 	bigIntOne = big.NewInt(1)
+)
+
+// Errors returned by this package, can be checked with errors.Is
+var (
+	// ErrInvalidIP the given string is not a valid IP address
+	ErrInvalidIP = errors.New("invalid ip")
+	// ErrIPNotInCIDR the given IP is not within the CIDR
+	ErrIPNotInCIDR = errors.New("ip is not in the cidr")
+	// ErrInvalidCIDR the given string is not a valid CIDR
+	ErrInvalidCIDR = errors.New("invalid cidr")
+	// ErrInvalidNum the number (or the length of the segments) must be a power of 2
+	ErrInvalidNum = errors.New("num must be a power of 2")
+	// ErrNumOutOfRange the number is out of the allowed mask range
+	ErrNumOutOfRange = errors.New("num out of range")
+	// ErrExceedMaxLimit the number of subnets exceeds the maximum limit
+	ErrExceedMaxLimit = errors.New("subnet number exceeds maximum limit")
+	// ErrUnsupportedMethod the SubNetting method is not supported
+	ErrUnsupportedMethod = errors.New("unsupported method")
+	// ErrNotSameMask the CIDRs do not have the same mask
+	ErrNotSameMask = errors.New("not the same mask")
+	// ErrNotContiguous the segments are not contiguous
+	ErrNotContiguous = errors.New("not contiguous segments")
 )
 
 const maxSubnetNum = 65536 // 2^16, reasonable limit to prevent memory issues
@@ -49,7 +72,15 @@ func (c CIDR) Equal(ns string) bool {
 }
 
 // EqualFold reports whether cidr and ns are the same CIDR (including IPv4-mapped)
+//
+// Deprecated: use EqualNormalized instead, which has the same behavior and a clearer name.
 func (c CIDR) EqualFold(ns string) bool {
+	return c.EqualNormalized(ns)
+}
+
+// EqualNormalized reports whether cidr and ns are the same CIDR,
+// comparing the normalized representation (including IPv4-mapped equivalence)
+func (c CIDR) EqualNormalized(ns string) bool {
 	c2, err := Parse(ns)
 	if err != nil {
 		return false
@@ -203,10 +234,10 @@ func (c CIDR) Each(iterator func(ip string) bool) {
 func (c CIDR) EachFrom(beginIP string, iterator func(ip string) bool) error {
 	next := net.ParseIP(beginIP)
 	if next == nil {
-		return fmt.Errorf("invalid begin ip")
+		return fmt.Errorf("%w: %v", ErrInvalidIP, beginIP)
 	}
 	if !c.ipNet.Contains(next) {
-		return fmt.Errorf("begin ip %v is not in the cidr", beginIP)
+		return fmt.Errorf("%w: %v", ErrIPNotInCIDR, beginIP)
 	}
 	endIP := c.EndIP()
 	for c.ipNet.Contains(next) {
@@ -238,11 +269,11 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 	ones, bits := c.ipNet.Mask.Size()
 	switch method {
 	default:
-		return nil, fmt.Errorf("unsupported method")
+		return nil, ErrUnsupportedMethod
 
 	case MethodSubnetNum:
 		if num < 1 || (num&(num-1)) != 0 {
-			return nil, fmt.Errorf("num must the power of 2")
+			return nil, ErrInvalidNum
 		}
 		newOnes = ones + int(math.Log2(float64(num)))
 
@@ -251,21 +282,21 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 
 	case MethodHostNum:
 		if num < 1 || (num&(num-1)) != 0 {
-			return nil, fmt.Errorf("num must the power of 2")
+			return nil, ErrInvalidNum
 		}
 		newOnes = bits - int(math.Log2(float64(num)))
 	}
 
 	// can't split when subnet mask greater than parent mask
 	if newOnes < ones || newOnes > bits {
-		return nil, fmt.Errorf("num must be between %v and %v", ones, bits)
+		return nil, fmt.Errorf("%w: must be between %v and %v", ErrNumOutOfRange, ones, bits)
 	}
 
 	// calculate subnet num
 	// check before shifting: shift over 16 exceeds maxSubnetNum (2^16),
 	// and 1<<64+ would silently overflow int to 0
 	if newOnes-ones > 16 {
-		return nil, fmt.Errorf("subnet number exceeds maximum limit of %d", maxSubnetNum)
+		return nil, fmt.Errorf("%w: exceeds maximum limit of %d", ErrExceedMaxLimit, maxSubnetNum)
 	}
 	subnetNum := 1 << uint(newOnes-ones) // shift <= 16, no overflow
 
@@ -286,7 +317,7 @@ func (c CIDR) SubNetting(method SubNettingMethod, num int) ([]*CIDR, error) {
 func SuperNetting(ns []string) (*CIDR, error) {
 	num := len(ns)
 	if num < 1 || (num&(num-1)) != 0 {
-		return nil, fmt.Errorf("ns length must the power of 2")
+		return nil, ErrInvalidNum
 	}
 
 	var mask string
@@ -294,7 +325,7 @@ func SuperNetting(ns []string) (*CIDR, error) {
 	for _, n := range ns {
 		c, err := Parse(n)
 		if err != nil {
-			return nil, fmt.Errorf("invalid CIDR:%v", n)
+			return nil, fmt.Errorf("%w: %v", ErrInvalidCIDR, n)
 		}
 		cidrs = append(cidrs, c)
 
@@ -302,7 +333,7 @@ func SuperNetting(ns []string) (*CIDR, error) {
 		if len(mask) == 0 {
 			mask = c.Mask().String()
 		} else if c.Mask().String() != mask {
-			return nil, fmt.Errorf("not the same mask")
+			return nil, ErrNotSameMask
 		}
 	}
 	SortCIDRAsc(cidrs)
@@ -312,7 +343,7 @@ func SuperNetting(ns []string) (*CIDR, error) {
 	for _, c := range cidrs {
 		if len(network) > 0 {
 			if !network.Equal(c.ipNet.IP) {
-				return nil, fmt.Errorf("not the contiguous segments")
+				return nil, ErrNotContiguous
 			}
 		}
 		network = c.EndIP()

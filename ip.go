@@ -121,14 +121,32 @@ func IPEqual(a, b net.IP) bool {
 	return IPCompare(a, b) == 0
 }
 
-// IP4StrToInt ipv4 ip to number
-func IP4StrToInt(s string) int64 {
-	obj := net.ParseIP(s)
-	if obj == nil || obj.To4() == nil {
-		return 0
+// ip4ToInt converts a v4 ip (4-byte or 4-in-6) to a number
+func ip4ToInt(ip net.IP) (int64, bool) {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return 0, false
 	}
-	ip4 := obj.To4()
-	return int64(binary.BigEndian.Uint32(ip4))
+	return int64(binary.BigEndian.Uint32(ip4)), true
+}
+
+// IP4StrToInt ipv4 ip to number, returns 0 if s is not a valid v4 ip
+func IP4StrToInt(s string) int64 {
+	n, _ := IP4StrToIntErr(s)
+	return n
+}
+
+// IP4StrToIntErr ipv4 ip to number, returns an error wrapping ErrInvalidIP if s is not a valid v4 ip
+func IP4StrToIntErr(s string) (int64, error) {
+	obj := net.ParseIP(s)
+	if obj == nil {
+		return 0, fmt.Errorf("%w: %v", ErrInvalidIP, s)
+	}
+	n, ok := ip4ToInt(obj)
+	if !ok {
+		return 0, fmt.Errorf("%w: %v", ErrInvalidIP, s)
+	}
+	return n, nil
 }
 
 // IP4IntToStr number to ipv4 ip
@@ -145,16 +163,16 @@ func IP4IntToStr(n int64) string {
 func IP4Distance(src, dst string) (int64, error) {
 	srcIp := net.ParseIP(src)
 	if srcIp == nil || srcIp.To4() == nil {
-		return 0, fmt.Errorf("invalid v4 ip: %v", src)
+		return 0, fmt.Errorf("%w: %v", ErrInvalidIP, src)
 	}
 
 	dstIp := net.ParseIP(dst)
 	if dstIp == nil || dstIp.To4() == nil {
-		return 0, fmt.Errorf("invalid v4 ip: %v", dst)
+		return 0, fmt.Errorf("%w: %v", ErrInvalidIP, dst)
 	}
 
-	srcInt := IP4StrToInt(srcIp.String())
-	dstInt := IP4StrToInt(dstIp.String())
+	srcInt, _ := ip4ToInt(srcIp)
+	dstInt, _ := ip4ToInt(dstIp)
 
 	return dstInt - srcInt, nil
 }
