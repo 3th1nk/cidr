@@ -4,16 +4,20 @@
 * easy to iterate through each ip in segment
 * check ipv4 or ipv6 segment
 * check whether segment contain ip
-* segments sort、split、merge
+* segments sort, split, merge
 * ip incr & decr
 * ip compare
+* errors checkable via `errors.Is`
 
 ## Code Example
-```
+```go
 package main
 
 import (
+	"errors"
 	"fmt"
+	"net"
+
 	"github.com/3th1nk/cidr"
 )
 
@@ -48,6 +52,12 @@ func main() {
 		fmt.Println("\t", c.String())
 	}
 
+	fmt.Println("subnet plan based on the subnet mask:")
+	cs, _ = c.SubNetting(cidr.MethodSubnetMask, 30)
+	for _, c := range cs {
+		fmt.Println("\t", c.String())
+	}
+
 	fmt.Println("merge network:")
 	c, _ = cidr.SuperNetting([]string{
 		"2001:db8::/66",
@@ -56,5 +66,11 @@ func main() {
 		"2001:db8:0:0:c000::/66",
 	})
 	fmt.Println("\t", c.String())
+
+	// errors can be checked with errors.Is
+	_, err := c.SubNetting(cidr.MethodSubnetNum, 3)
+	if errors.Is(err, cidr.ErrInvalidNum) {
+		fmt.Println("invalid num:", err)
+	}
 }
 ```
