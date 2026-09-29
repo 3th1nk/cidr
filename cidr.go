@@ -62,6 +62,27 @@ func ParseNoError(s string) *CIDR {
 	return c
 }
 
+// ParseLoose parses s as a CIDR notation IP address and mask length,
+// tolerating a bare IP address (treated as a single-host CIDR, e.g.
+// "192.168.1.10" becomes "192.168.1.10/32") and host bits set in the
+// IP part, which are masked to the network address
+// (e.g. "192.168.1.10/24" becomes "192.168.1.0/24", while the original
+// prefix is kept accessible via IP())
+func ParseLoose(s string) (*CIDR, error) {
+	if !strings.Contains(s, "/") {
+		ip := net.ParseIP(s)
+		if ip == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidCIDR, s)
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		s = fmt.Sprintf("%v/%v", s, bits)
+	}
+	return Parse(s)
+}
+
 // Equal reports whether cidr and ns are the same CIDR (excluding IPv4-mapped)
 func (c CIDR) Equal(ns string) bool {
 	c2, err := Parse(ns)
@@ -124,6 +145,45 @@ func (c CIDR) Contains(ip string) bool {
 		return false
 	}
 	return c.ipNet.Contains(ipObj)
+}
+
+// isV6Family reports whether the CIDR belongs to the pure IPv6 family,
+// excluding IPv4 and IPv4-mapped CIDRs
+func (c CIDR) isV6Family() bool {
+	return c.IsIPv6() && !isIPv4Mapped(c.ipNet.IP)
+}
+
+// Overlaps reports whether c and o overlap (partially or fully).
+// IPv4 (including IPv4-mapped) and pure IPv6 CIDRs are treated as
+// different families and never overlap.
+func (c CIDR) Overlaps(o *CIDR) bool {
+	if o == nil || c.isV6Family() != o.isV6Family() {
+		return false
+	}
+	cs, ce := c.IPRange()
+	os, oe := o.IPRange()
+	return IPCompare(cs, oe) <= 0 && IPCompare(os, ce) <= 0
+}
+
+// IsSubnetOf reports whether c is a subnet of o (or equal to it)
+func (c CIDR) IsSubnetOf(o *CIDR) bool {
+	if o == nil || c.isV6Family() != o.isV6Family() {
+		return false
+	}
+	cOnes, _ := c.ipNet.Mask.Size()
+	oOnes, _ := o.ipNet.Mask.Size()
+	if cOnes < oOnes {
+		return false
+	}
+	return o.ipNet.Contains(c.ipNet.IP)
+}
+
+// IsSupernetOf reports whether c is a supernet of o (or equal to it)
+func (c CIDR) IsSupernetOf(o *CIDR) bool {
+	if o == nil {
+		return false
+	}
+	return o.IsSubnetOf(&c)
 }
 
 // CIDR returns the normalized network address based on the mask, not the original input.

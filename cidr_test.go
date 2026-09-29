@@ -356,6 +356,88 @@ func TestCIDR_SuperNetting_Misaligned(t *testing.T) {
 	assert.Equal(t, "192.168.0.255", c.EndIP().String())
 }
 
+func TestCIDR_ParseLoose(t *testing.T) {
+	// 裸 IP 视为单主机网段
+	c, err := ParseLoose("192.168.1.10")
+	assert.NoError(t, err)
+	assert.Equal(t, "192.168.1.10/32", c.String())
+
+	c, err = ParseLoose("2001:db8::1")
+	assert.NoError(t, err)
+	assert.Equal(t, "2001:db8::1/128", c.String())
+
+	// host bits 非零,归一化为网络地址,前缀保留在 IP() 中
+	c, err = ParseLoose("192.168.1.10/24")
+	assert.NoError(t, err)
+	assert.Equal(t, "192.168.1.0/24", c.String())
+	assert.Equal(t, "192.168.1.10", c.IP().String())
+
+	// 非法输入
+	c, err = ParseLoose("bad")
+	assert.ErrorIs(t, err, ErrInvalidCIDR)
+	assert.Nil(t, c)
+
+	c, err = ParseLoose("192.168.1.0/33")
+	assert.Error(t, err)
+	assert.Nil(t, c)
+}
+
+func TestCIDR_Overlaps(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want bool
+	}{
+		{"192.168.1.0/24", "192.168.1.0/25", true},         // 包含
+		{"192.168.1.0/25", "192.168.1.0/24", true},         // 被包含(对称)
+		{"192.168.1.0/25", "192.168.1.128/25", false},      // 相邻不重叠
+		{"192.168.1.0/24", "192.168.2.0/24", false},        // 分离
+		{"0.0.0.0/0", "192.168.1.0/24", true},              // v4 全网
+		{"2001:db8::/32", "2001:db8::1/128", true},         // IPv6
+		{"2001:db8::/32", "2001:db9::/32", false},          // IPv6 分离
+		{"2001:db8::/32", "192.168.1.0/24", false},         // 跨族(纯 v6 与 v4)
+		{"::ffff:192.168.1.0/120", "192.168.1.0/24", true}, // v4-mapped 与 v4 等价
+	}
+
+	for _, tt := range tests {
+		assert.Equalf(t, tt.want, ParseNoError(tt.a).Overlaps(ParseNoError(tt.b)), "%v overlaps %v", tt.a, tt.b)
+	}
+}
+
+func TestCIDR_IsSubnetOf(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want bool
+	}{
+		{"192.168.1.0/24", "192.168.0.0/16", true},
+		{"192.168.0.0/16", "192.168.1.0/24", false},
+		{"192.168.1.0/24", "192.168.1.0/24", true}, // 相等视为子网
+		{"192.168.1.0/24", "0.0.0.0/0", true},
+		{"2001:db8::/32", "2001::/16", true},
+		{"192.168.1.0/24", "2001:db8::/32", false},         // 跨族
+		{"::ffff:192.168.1.0/120", "192.168.1.0/24", true}, // v4-mapped 子网于 v4
+	}
+
+	for _, tt := range tests {
+		assert.Equalf(t, tt.want, ParseNoError(tt.a).IsSubnetOf(ParseNoError(tt.b)), "%v is subnet of %v", tt.a, tt.b)
+	}
+}
+
+func TestCIDR_IsSupernetOf(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want bool
+	}{
+		{"192.168.0.0/16", "192.168.1.0/24", true},
+		{"192.168.1.0/24", "192.168.0.0/16", false},
+		{"192.168.1.0/24", "192.168.1.0/24", true}, // 相等视为父网
+		{"0.0.0.0/0", "192.168.1.0/24", true},
+	}
+
+	for _, tt := range tests {
+		assert.Equalf(t, tt.want, ParseNoError(tt.a).IsSupernetOf(ParseNoError(tt.b)), "%v is supernet of %v", tt.a, tt.b)
+	}
+}
+
 func TestCIDR_IsPureIPv6(t *testing.T) {
 	tests := []struct {
 		cidr       string
